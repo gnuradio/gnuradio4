@@ -54,6 +54,7 @@ suite agc2 = [] {
                                40.f * std::cos(phi));
         }
 
+        using Agc2CC = gr::blocks::analog::Agc2CC;   // updated alias
         auto y = run<std::complex<float>, Agc2CC>(drive);
 
         float err = 0.f;
@@ -76,6 +77,7 @@ suite agc2 = [] {
             drive.emplace_back(60.f * std::cos(phi));
         }
 
+        using Agc2FF = gr::blocks::analog::Agc2FF;   // updated alias
         auto y = run<float, Agc2FF>(drive);
 
         float err = 0.f;
@@ -87,4 +89,4 @@ suite agc2 = [] {
     };
 };
 
-int main() {}   // Boost.UT auto‑runs suites
+int main() {}   // Boost.UT auto-runs suites

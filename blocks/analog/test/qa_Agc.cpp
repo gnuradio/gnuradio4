@@ -51,7 +51,7 @@ suite agc = [] {
             drive.emplace_back(30.f * std::cos(phi), 30.f * std::sin(phi));
         }
 
-        using AgcCC = Agc<std::complex<float>, false>;
+        using AgcCC = gr::blocks::analog::AgcCC;
         auto y = run<std::complex<float>, AgcCC>(drive);
 
         float err = 0.f;
@@ -74,7 +74,7 @@ suite agc = [] {
             drive.emplace_back(50.f * std::sin(phi));
         }
 
-        using AgcFF = Agc<float, true>;
+        using AgcFF = gr::blocks::analog::AgcFF; 
         auto y = run<float, AgcFF>(drive);
 
         float err = 0.f;

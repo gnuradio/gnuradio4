@@ -1,4 +1,5 @@
 #include <boost/ut.hpp>
+#include <cmath>
 #include <complex>
 #include <numbers>
 #include <vector>
@@ -18,18 +19,18 @@ std::vector<OutT> run(const std::vector<float>& drive, float sens)
 {
     Graph g;
 
-    auto& src  = g.emplaceBlock<TagSource<float>>();
-    src.values = drive;                        // emit exactly once
+    auto& src = g.emplaceBlock<TagSource<float>>(
+        { { "values", drive }, { "n_samples_max", drive.size() } });
 
-    auto& mod  = g.emplaceBlock<PhaseModulator>();
-    mod.set_sensitivity(sens);
+    auto& mod = g.emplaceBlock<PhaseModC>();
+    mod.sensitivity = sens;                         // set public property
 
     auto& sink =
         g.emplaceBlock<TagSink<OutT, ProcessFunction::USE_PROCESS_BULK>>();
 
-    [[maybe_unused]] auto _c1 =
+    [[maybe_unused]] auto c1 =
         g.connect<"out">(src).template to<"in">(mod);
-    [[maybe_unused]] auto _c2 =
+    [[maybe_unused]] auto c2 =
         g.connect<"out">(mod).template to<"in">(sink);
 
     scheduler::Simple sch{ std::move(g) };
@@ -40,16 +41,16 @@ std::vector<OutT> run(const std::vector<float>& drive, float sens)
 
 suite phase_mod = [] {
     "basic"_test = [] {
-        constexpr float sens = std::numbers::pi_v<float> / 4.f;
+        constexpr float sens = std::numbers::pi_v<float> / 4.0f;
 
         const std::vector<float> drive = { 0.25f, 0.5f, 0.25f,
                                            -0.25f, -0.5f, -0.25f };
 
         std::vector<std::complex<float>> ref;
         ref.reserve(drive.size());
-        for (auto v : drive) {
-            const float phi = sens * v;
-            ref.emplace_back(std::cos(phi), std::sin(phi));
+        for (float v : drive) {
+            const float φ = sens * v;
+            ref.emplace_back(std::cos(φ), std::sin(φ));
         }
 
         auto y = run(drive, sens);
@@ -64,4 +65,4 @@ suite phase_mod = [] {
     };
 };
 
-int main() {}   // Boost.UT auto‑runs suites
+int main() { }   // Boost.UT auto-runs suites

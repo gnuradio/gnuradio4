@@ -15,7 +15,7 @@ using namespace boost::ut;
 
 template<typename InT, typename OutT>
 std::vector<OutT> run(const std::vector<InT>& drive,
-                      float fs, int decim, float f_pass)
+                      float fs, float f_pass)
 {
     Graph g;
 
@@ -23,9 +23,8 @@ std::vector<OutT> run(const std::vector<InT>& drive,
     src.values = drive;
 
     auto& dem  = g.emplaceBlock<AmDemod>();
-    dem.set_chan_rate(fs);
-    dem.set_audio_decim(decim);
-    dem.set_audio_pass(f_pass);
+    dem.chan_rate  = fs;      // set public properties directly
+    dem.audio_pass = f_pass;  // (start() will recompute α)
 
     auto& sink =
         g.emplaceBlock<TagSink<OutT, ProcessFunction::USE_PROCESS_BULK>>();
@@ -35,8 +34,8 @@ std::vector<OutT> run(const std::vector<InT>& drive,
     [[maybe_unused]] auto c2 =
         g.connect<"out">(dem).template to<"in">(sink);
 
-    scheduler::Simple sch{std::move(g)};
-    expect(bool{sch.runAndWait()});
+    scheduler::Simple sch{ std::move(g) };
+    expect(bool{ sch.runAndWait() });
 
     return sink._samples;
 }
@@ -44,9 +43,8 @@ std::vector<OutT> run(const std::vector<InT>& drive,
 suite am_demod = [] {
     "constant_envelope"_test = [] {
         constexpr float fs   = 48'000.f;
-        constexpr int   dec  = 8;
         constexpr float f_lp = 4'000.f;
-        constexpr std::size_t N = 4 * 48'000;   // 4 s
+        constexpr std::size_t N = 4 * 48'000;   // 4 s
 
         std::vector<std::complex<float>> drive;
         drive.reserve(N);
@@ -57,7 +55,7 @@ suite am_demod = [] {
                                0.7f * std::sin(phi));
         }
 
-        auto y = run<std::complex<float>, float>(drive, fs, dec, f_lp);
+        auto y = run<std::complex<float>, float>(drive, fs, f_lp);
 
         const std::size_t skip = 200;           // allow IIR to settle
         float mean = 0.f;
@@ -65,8 +63,8 @@ suite am_demod = [] {
             mean += y[i];
         mean /= static_cast<float>(y.size() - skip);
 
-        expect(std::abs(mean - 0.7f) < 0.005f); // ≤ 0.5 % error
+        expect(std::abs(mean - 0.7f) < 0.005f); // ≤ 0.5 % error
     };
 };
 
-int main() {}   // Boost.UT auto‑runs suites
+int main() {}   // Boost.UT auto-runs suites

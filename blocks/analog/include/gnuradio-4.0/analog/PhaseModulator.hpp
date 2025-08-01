@@ -1,51 +1,55 @@
-#ifndef INCLUDED_ANALOG_PHASE_MODULATOR_HPP
-#define INCLUDED_ANALOG_PHASE_MODULATOR_HPP
+#ifndef GR_BLOCKS_ANALOG_PHASEMODULATOR_HPP_
+#define GR_BLOCKS_ANALOG_PHASEMODULATOR_HPP_
 
 #include <cmath>
 #include <complex>
+#include <numbers>
 
 #include <gnuradio-4.0/Block.hpp>
 #include <gnuradio-4.0/BlockRegistry.hpp>
 
 namespace gr::blocks::analog {
 
-struct PhaseModulator
-  : gr::Block<PhaseModulator, gr::Resampling<1UZ, 1UZ, false>>   // 1 : 1
+struct PhaseModulator : Block<PhaseModulator>
 {
-    using Description = Doc<R""(@brief Phase modulator (float→complex))"">;
+    using Description = Doc<"Phase modulator (float → complex<float>)">;
 
-    PortIn<float>               in;
+    PortIn<float>                in;
     PortOut<std::complex<float>> out;
 
-    Annotated<float, "sensitivity",
-              Doc<"phase change per input unit [rad]">> sensitivity{1.0f};
+    Annotated<float,
+              "sensitivity",
+              Visible,
+              Doc<"Phase change [rad] per input-unit">>
+        sensitivity { 1.0f };
 
     GR_MAKE_REFLECTABLE(PhaseModulator, in, out, sensitivity);
 
-    explicit PhaseModulator(gr::property_map) {}
+    explicit PhaseModulator(property_map) {}
 
-    void set_sensitivity(float s) { sensitivity = s; }
-
-    void settingsChanged(const property_map&, const property_map&)
-    { /* nothing else to recompute */ }
+    work::Status processOne(float x, std::complex<float>& y)
+    {
+        const float φ = x * sensitivity;
+        y = { std::cos(φ), std::sin(φ) };
+        return work::Status::OK;
+    }
 
     template<InputSpanLike  InSpan,
              OutputSpanLike OutSpan>
-    [[nodiscard]] work::Status
-    processBulk(const InSpan& xs, OutSpan& ys)
+    work::Status processBulk(const InSpan& xs, OutSpan& ys)
     {
         const std::size_t n = std::min(xs.size(), ys.size());
-        for (std::size_t i = 0; i < n; ++i) {
-            const float phi = sensitivity * xs[i];
-            ys[i] = { std::cos(phi), std::sin(phi) };
-        }
+        for (std::size_t i = 0; i < n; ++i)
+            processOne(xs[i], ys[i]);
         ys.publish(n);
         return work::Status::OK;
     }
 };
 
+using PhaseModC = PhaseModulator;
+
 GR_REGISTER_BLOCK("gr::blocks::analog::PhaseModulator",
                   gr::blocks::analog::PhaseModulator)
 
 } // namespace gr::blocks::analog
-#endif /* INCLUDED_ANALOG_PHASE_MODULATOR_HPP */
+#endif /* GR_BLOCKS_ANALOG_PHASEMODULATOR_HPP_ */
