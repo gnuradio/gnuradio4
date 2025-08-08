@@ -32,8 +32,7 @@ struct Agc : Block<Agc<T, IsFloat>>
             const auto x = xs[i];
             const auto y = static_cast<T>(x * g);              // apply current gain
 
-            const float amp = IsFloat ? std::fabs(y)
-                                      : std::abs(y);          // magnitude of *output*
+            const float amp = std::abs(y);                        // magnitude of *output*
             g += (R - amp) * r;                                // adapt afterwards
             if (M > 0.f && g > M) g = M;
 

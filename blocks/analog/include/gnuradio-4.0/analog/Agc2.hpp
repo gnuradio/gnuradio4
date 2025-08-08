@@ -39,8 +39,8 @@ struct Agc2 : Block<Agc2<T, IsFloat>>
             const auto x = xs[i];
             const auto y = static_cast<T>(x * g);         // apply current gain
 
-            const float amp  = IsFloat ? std::fabs(y) : std::abs(y);
-            const float rate = (std::fabs(amp - R) > g) ? A : D;   // attack vs decay
+            const float amp  = std::abs(y);                        // magnitude of output
+            const float rate = (std::abs(amp - R) > g) ? A : D;    // attack vs decay
             g -= (amp - R) * rate;
 
             if (g < 1.0e-5f) g = 1.0e-5f;                // avoid blow‑ups
