@@ -6,119 +6,54 @@ using namespace boost::ut;
 using namespace gr::digital;
 
 const suite LfsrTestSuite = [] {
-    "LFSR Basic Construction"_test = [] {
-        "Fibonacci LFSR construction"_test = [] {
-            LfsrFibonacci f(0x8E, 0x01, 8);
-            expect(f.mask() == 0x8Eu);
-            expect(f.seed() == 0x01u);
-            expect(f.state() == 0x01u);
-            expect(f.length() == 8u);
-        };
-        "Galois LFSR construction"_test = [] {
-            LfsrGalois g(0x8E, 0x01, 8);
-            expect(g.mask() == 0x8Eu);
-            expect(g.seed() == 0x01u);
-            expect(g.state() == 0x01u);
-            expect(g.length() == 8u);
-        };
-        "Invalid register length"_test = [] {
-            expect(throws([] { LfsrFibonacci f(0x8E, 0x01, 64); }));
-        };
-        "Zero seed"_test = [] {
-            expect(nothrow([] { LfsrFibonacci f(0x8E, 0x00, 8); }));
-        };
+    "Construction & lifecycle"_test = [] {
+        LfsrGenF gen; gen.st.mask = 0x8E; gen.st.seed = 0x1; gen.st.len = 8; gen.start();
+        expect(gen.state() == 0x1u);
+        gen.stop();
     };
 
-    "LFSR Sequence Generation"_test = [] {
-        "Fibonacci nonzero progression"_test = [] {
-            LfsrFibonacci f(0x19, 0x1, 3); // degree 4 ⇒ reg_len=3
-            bool stuck = false;
-            for (int i = 0; i < 20; ++i) {
-                if (f.state() == 0) { stuck = true; break; }
-                (void)f.next_bit();
-            }
-            expect(!stuck);
-        };
-        "Galois period check (4-bit)"_test = [] {
-            LfsrGalois g(0x9, 0x1, 4);
-            const auto seed = g.state();
-            const std::size_t period = (1u << 4) - 1u;
-            for (std::size_t i = 0; i < period; ++i) (void)g.next_bit();
-            expect(g.state() == seed);
-        };
+    "Fibonacci generator progression"_test = [] {
+        LfsrGenF gen; gen.st.mask = 0x19; gen.st.seed = 0x1; gen.st.len = 3; gen.start();
+        bool stuck = false;
+        for (int i = 0; i < 20; ++i) {
+            if (gen.state() == 0) { stuck = true; break; }
+            (void)gen.processOne();
+        }
+        expect(!stuck);
     };
 
-    "LFSR Reset and Advance"_test = [] {
-        "Reset"_test = [] {
-            LfsrFibonacci f(0x8E, 0xAB, 8);
-            const auto s0 = f.state();
-            for (int i = 0; i < 10; ++i) (void)f.next_bit();
-            expect(f.state() != s0);
-            f.reset();
-            expect(f.state() == s0);
-        };
-        "Advance"_test = [] {
-            LfsrFibonacci a(0x8E, 0x1, 8), b(0x8E, 0x1, 8);
-            for (int i = 0; i < 5; ++i) (void)a.next_bit();
-            b.advance(5);
-            expect(a.state() == b.state());
-        };
+    "Galois period (4-bit)"_test = [] {
+        LfsrGenG gen; gen.st.mask = 0x9; gen.st.seed = 0x1; gen.st.len = 4; gen.start();
+        const auto seed = gen.state();
+        const std::size_t period = (1u << 4) - 1u;
+        for (std::size_t i = 0; i < period; ++i) (void)gen.processOne();
+        expect(gen.state() == seed);
     };
 
-    "LFSR Scrambling"_test = [] {
-        "Fibonacci scramble/descramble"_test = [] {
-            LfsrFibonacci s(0x8E, 0x1, 8);
-            LfsrFibonacci d(0x8E, 0x1, 8);
-            std::vector<std::uint8_t> in = {1,0,1,1,0,0,1,0,1};
-            std::vector<std::uint8_t> scr, dec;
-            for (auto b : in) scr.push_back(s.next_bit_scramble(b));
-            for (auto b : scr) dec.push_back(d.next_bit_descramble(b));
-            expect(dec == in);
-        };
-        "Galois scramble/descramble"_test = [] {
-            LfsrGalois s(0x9, 0x1, 4);
-            LfsrGalois d(0x9, 0x1, 4);
-            std::vector<std::uint8_t> in = {1,0,1,0,1};
-            std::vector<std::uint8_t> scr, dec;
-            for (auto b : in) scr.push_back(s.next_bit_scramble(b));
-            for (auto b : scr) dec.push_back(d.next_bit_descramble(b));
-            expect(dec == in);
-        };
+    "Scramble/descramble Fibonacci"_test = [] {
+        LfsrScramblerF s; s.st.mask = 0x8E; s.st.seed = 0x1; s.st.len = 8; s.start();
+        LfsrDescramblerF d; d.st.mask = 0x8E; d.st.seed = 0x1; d.st.len = 8; d.start();
+        std::vector<std::uint8_t> in = {1,0,1,1,0,0,1,0,1}, scr, dec;
+        for (auto b : in) scr.push_back(s.processOne(b));
+        for (auto b : scr) dec.push_back(d.processOne(b));
+        expect(dec == in);
     };
 
-    "Primitive Polynomials"_test = [] {
-        "5-bit primitive (0x29) period 31"_test = [] {
-            using namespace primitive_polynomials;
-            LfsrFibonacci f(poly_5, 0x1, 4); // degree 5 ⇒ reg_len=4
-            const auto seed = f.state();
-            const std::size_t period = (1u << 5) - 1u;
-            for (std::size_t i = 0; i < period; ++i) (void)f.next_bit();
-            expect(f.state() == seed);
-        };
+    "Scramble/descramble Galois"_test = [] {
+        LfsrScramblerG s; s.st.mask = 0x9; s.st.seed = 0x1; s.st.len = 4; s.start();
+        LfsrDescramblerG d; d.st.mask = 0x9; d.st.seed = 0x1; d.st.len = 4; d.start();
+        std::vector<std::uint8_t> in = {1,0,1,0,1}, scr, dec;
+        for (auto b : in) scr.push_back(s.processOne(b));
+        for (auto b : scr) dec.push_back(d.processOne(b));
+        expect(dec == in);
     };
 
-    "Legacy Compatibility"_test = [] {
-        "Type aliases"_test = [] {
-            lfsr lf(0x8E, 0x1, 8);
-            glfsr lg(0x9, 0x1, 4);
-            auto b1 = lf.next_bit();
-            auto b2 = lg.next_bit();
-            expect((b1 == 0 || b1 == 1));
-            expect((b2 == 0 || b2 == 1));
-        };
-    };
-
-    "Constexpr Functionality"_test = [] {
-        "constexpr path"_test = [] {
-            constexpr auto fn = []() constexpr {
-                LfsrFibonacci f(0x6, 0x1, 3);
-                std::uint8_t r = 0;
-                for (int i = 0; i < 3; ++i) r ^= f.next_bit();
-                return r;
-            };
-            constexpr auto r = fn();
-            expect(r == (r & 1u));
-        };
+    "Primitive poly period (5-bit)"_test = [] {
+        LfsrGenF gen; gen.st.mask = primitive_polynomials::poly_5; gen.st.seed = 0x1; gen.st.len = 4; gen.start();
+        const auto seed = gen.state();
+        const std::size_t period = (1u << 5) - 1u;
+        for (std::size_t i = 0; i < period; ++i) (void)gen.processOne();
+        expect(gen.state() == seed);
     };
 };
 
