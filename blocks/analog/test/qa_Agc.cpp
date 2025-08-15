@@ -13,6 +13,10 @@ using namespace gr::testing;
 using namespace gr::blocks::analog;
 using namespace boost::ut;
 
+// Explicit type aliases for CI compatibility
+using AgcCC = gr::blocks::analog::Agc<std::complex<float>, false>;
+using AgcFF = gr::blocks::analog::Agc<float, true>;
+
 template<typename SampleT, typename BlockT>
 std::vector<SampleT> run(const std::vector<SampleT>& drive,
                          float rate = 2.0e-2f)
@@ -41,7 +45,7 @@ suite agc = [] {
 
     "AgcCC tracks magnitude"_test = [] {
         constexpr std::size_t N    = 2'048;
-        constexpr std::size_t skip = 1'512;          // leave 536 samples for eval
+        constexpr std::size_t skip = 1'512;          // leave 536 samples for eval
 
         std::vector<std::complex<float>> drive;
         drive.reserve(N);
@@ -51,7 +55,6 @@ suite agc = [] {
             drive.emplace_back(30.f * std::cos(phi), 30.f * std::sin(phi));
         }
 
-        using AgcCC = Agc<std::complex<float>, false>;
         auto y = run<std::complex<float>, AgcCC>(drive);
 
         float err = 0.f;
@@ -74,7 +77,6 @@ suite agc = [] {
             drive.emplace_back(50.f * std::sin(phi));
         }
 
-        using AgcFF = Agc<float, true>;
         auto y = run<float, AgcFF>(drive);
 
         float err = 0.f;
@@ -86,4 +88,4 @@ suite agc = [] {
     };
 };
 
-int main() {}   // Boost.UT auto‑runs suites
+int main() {}   // Boost.UT auto-runs suites

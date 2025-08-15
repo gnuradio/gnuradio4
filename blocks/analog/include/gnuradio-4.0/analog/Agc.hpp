@@ -3,13 +3,16 @@
 
 #include <gnuradio-4.0/Block.hpp>
 #include <gnuradio-4.0/BlockRegistry.hpp>
+#include <gnuradio-4.0/Port.hpp>
+#include <gnuradio-4.0/PortTraits.hpp>
 #include <cmath>
 #include <complex>
+#include <type_traits>
 
 namespace gr::blocks::analog {
 
 template<typename T, bool IsFloat = std::is_floating_point_v<T>>
-struct Agc : Block<Agc<T, IsFloat>>
+struct Agc : public Block<Agc<T, IsFloat>>
 {
     PortIn<T>  in;
     PortOut<T> out;

@@ -13,6 +13,10 @@ using namespace gr::testing;
 using namespace gr::blocks::analog;
 using namespace boost::ut;
 
+// Explicit type aliases for CI compatibility
+using Agc2CC = gr::blocks::analog::Agc2<std::complex<float>, false>;
+using Agc2FF = gr::blocks::analog::Agc2<float, true>;
+
 template<typename SampleT, typename BlockT>
 std::vector<SampleT> run(const std::vector<SampleT>& drive,
                          float a_rate = 1.0e-1f,
