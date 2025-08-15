@@ -16,9 +16,9 @@ target_link_libraries(gr-digital-test-helpers
 # Core tests (foundation)
 add_executable(qa_digital_core
     core/qa_Lfsr.cpp
-    # core/qa_Crc.cpp           # TODO: Implement
-    # core/qa_Scrambler.cpp     # TODO: Implement  
-    # core/qa_Constellation.cpp # TODO: Implement
+    core/qa_Crc.cpp           # TODO: Implement
+    core/qa_Scrambler.cpp     # TODO: Implement  
+    core/qa_Constellation.cpp # TODO: Implement
 )
 target_link_libraries(qa_digital_core
     PRIVATE
@@ -29,19 +29,19 @@ add_test(NAME qa_digital_core COMMAND qa_digital_core)
 # TODO: Enable these tests as we implement the corresponding blocks
 
 # # Mapping tests
-# add_executable(qa_digital_mapping
-#     mapping/qa_ChunksToSymbols.cpp
+ add_executable(qa_digital_mapping
+     mapping/qa_ChunksToSymbols.cpp
 #     mapping/qa_ConstellationEncoder.cpp
 #     mapping/qa_ConstellationSoftDecoder.cpp
 #     mapping/qa_DiffCoding.cpp
 #     mapping/qa_BinarySlicer.cpp
 #     mapping/qa_Map.cpp
-# )
-# target_link_libraries(qa_digital_mapping
-#     PRIVATE
-#     gr-digital-test-helpers
-# )
-# add_test(NAME qa_digital_mapping COMMAND qa_digital_mapping)
+ )
+ target_link_libraries(qa_digital_mapping
+     PRIVATE
+     gr-digital-test-helpers
+ )
+ add_test(NAME qa_digital_mapping COMMAND qa_digital_mapping)
 
 # # Timing tests
 # add_executable(qa_digital_timing
