@@ -1,12 +1,3 @@
-// blocks/digital/test/mapping/qa_ChunksToSymbols.cpp
-/*
- * Unit tests for the lean C++23 ChunksToSymbols mapper.
- * - Focus on processOne(..) as the primitive
- * - Cover 1D and multi-D, table updates, and corner cases
- *
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
-
 #include <boost/ut.hpp>
 #include <gnuradio-4.0/digital/mapping/ChunksToSymbols.hpp>
 

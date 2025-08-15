@@ -1,4 +1,3 @@
-// blocks/digital/test/core/qa_Crc.cpp
 #include <boost/ut.hpp>
 #include <gnuradio-4.0/digital/core/Crc.hpp>
 #include <vector>

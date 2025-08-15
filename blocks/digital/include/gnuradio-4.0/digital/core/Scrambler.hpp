@@ -15,10 +15,6 @@ inline std::uint8_t parity64(std::uint64_t v) noexcept {
     return static_cast<std::uint8_t>((0x6996u >> v) & 1u);
 }
 } // namespace detail
-
-// -----------------------------------------------------------------------------
-// Additive scrambler (bytes & soft symbols) - unchanged (your version was OK)
-// -----------------------------------------------------------------------------
 struct AdditiveScramblerState {
     std::uint64_t mask = 0;
     std::uint64_t seed = 1;
@@ -119,11 +115,6 @@ using AdditiveScrambler =
     std::conditional_t<std::is_same_v<T, std::uint8_t>, AdditiveScramblerBB, AdditiveScramblerT<T>>;
 
 
-// -----------------------------------------------------------------------------
-// Self-synchronizing scrambler/descrambler (bitwise)
-// Right-shift, insert new bit at MSB, taps taken from (reg >> 1)
-// This matches GR-3.x semantics (e.g., CCSDS-7: mask=0x8A, seed=0x7F, len=7).
-// -----------------------------------------------------------------------------
 struct ScramblerBBState {
     std::uint64_t mask = 0; // taps over previous scrambled bits
     std::uint64_t seed = 0; // initial shift register contents

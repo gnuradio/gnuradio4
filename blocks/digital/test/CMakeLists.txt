@@ -1,6 +1,3 @@
-# Digital block unit tests
-
-# Test helper library for digital blocks
 add_library(gr-digital-test-helpers INTERFACE)
 target_include_directories(gr-digital-test-helpers
     INTERFACE
