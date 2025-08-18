@@ -16,9 +16,9 @@ using complexf = std::complex<float>;
 
 template <class IN_T, class OUT_T>
 struct ChunksToSymbols {
-    unsigned D{1};                 // dimensions per symbol
-    std::vector<OUT_T> table{};    // size must be arity * D after start()
-    unsigned arity{0};             // derived in start()
+    unsigned D{1};                 
+    std::vector<OUT_T> table{};    
+    unsigned arity{0};             
 
     mutable std::vector<OUT_T> scratch{};
 

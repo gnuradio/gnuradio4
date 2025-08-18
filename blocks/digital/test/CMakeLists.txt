@@ -13,9 +13,9 @@ target_link_libraries(gr-digital-test-helpers
 # Core tests (foundation)
 add_executable(qa_digital_core
     core/qa_Lfsr.cpp
-    core/qa_Crc.cpp           # TODO: Implement
-    core/qa_Scrambler.cpp     # TODO: Implement  
-    core/qa_Constellation.cpp # TODO: Implement
+    core/qa_Crc.cpp           
+    core/qa_Scrambler.cpp       
+    core/qa_Constellation.cpp 
 )
 target_link_libraries(qa_digital_core
     PRIVATE
@@ -23,16 +23,12 @@ target_link_libraries(qa_digital_core
 )
 add_test(NAME qa_digital_core COMMAND qa_digital_core)
 
-# TODO: Enable these tests as we implement the corresponding blocks
-
 # # Mapping tests
  add_executable(qa_digital_mapping
      mapping/qa_ChunksToSymbols.cpp
-#     mapping/qa_ConstellationEncoder.cpp
-#     mapping/qa_ConstellationSoftDecoder.cpp
-#     mapping/qa_DiffCoding.cpp
-#     mapping/qa_BinarySlicer.cpp
-#     mapping/qa_Map.cpp
+     mapping/qa_DiffCoding.cpp
+     mapping/qa_BinarySlicer.cpp
+     mapping/qa_MapBB.cpp     
  )
  target_link_libraries(qa_digital_mapping
      PRIVATE
@@ -41,17 +37,18 @@ add_test(NAME qa_digital_core COMMAND qa_digital_core)
  add_test(NAME qa_digital_mapping COMMAND qa_digital_mapping)
 
 # # Timing tests
-# add_executable(qa_digital_timing
-#     timing/qa_ClockRecoveryMM.cpp
-#     timing/qa_SymbolSync.cpp
-#     timing/qa_CostasLoop.cpp
+ add_executable(qa_digital_timing
+     timing/qa_ClockRecoveryMM.cpp
+     timing/qa_SymbolSync.cpp
+     timing/qa_CostasLoop.cpp
+     timing/qa_FllBandEdge.cpp
 #     timing/qa_PfbClockSync.cpp
-# )
-# target_link_libraries(qa_digital_timing
-#     PRIVATE
-#     gr-digital-test-helpers
-# )
-# add_test(NAME qa_digital_timing COMMAND qa_digital_timing)
+ )
+ target_link_libraries(qa_digital_timing
+     PRIVATE
+     gr-digital-test-helpers
+ )
+ add_test(NAME qa_digital_timing COMMAND qa_digital_timing)
 
 # # Measurement tests
 # add_executable(qa_digital_measure
