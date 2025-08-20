@@ -51,28 +51,28 @@ add_test(NAME qa_digital_core COMMAND qa_digital_core)
  add_test(NAME qa_digital_timing COMMAND qa_digital_timing)
 
 # # Measurement tests
-# add_executable(qa_digital_measure
-#     measure/qa_MpskSnrEst.cpp
-#     measure/qa_MeasEvm.cpp
-#     measure/qa_ProbeDensity.cpp
-# )
-# target_link_libraries(qa_digital_measure
-#     PRIVATE
-#     gr-digital-test-helpers
-# )
-# add_test(NAME qa_digital_measure COMMAND qa_digital_measure)
+ add_executable(qa_digital_measure
+     measure/qa_MpskSnrEst.cpp
+     measure/qa_MeasEvm.cpp
+     measure/qa_ProbeDensity.cpp
+ )
+ target_link_libraries(qa_digital_measure
+     PRIVATE
+     gr-digital-test-helpers
+ )
+ add_test(NAME qa_digital_measure COMMAND qa_digital_measure)
 
 # # Equalizer tests
-# add_executable(qa_digital_equalizer
-#     equalizer/qa_AdaptiveAlgorithm.cpp
-#     equalizer/qa_LinearEqualizer.cpp
-#     equalizer/qa_DFE.cpp
-# )
-# target_link_libraries(qa_digital_equalizer
-#     PRIVATE
-#     gr-digital-test-helpers
-# )
-# add_test(NAME qa_digital_equalizer COMMAND qa_digital_equalizer)
+ add_executable(qa_digital_equalizer
+     equalizer/qa_AdaptiveAlgorithm.cpp
+     equalizer/qa_LinearEqualizer.cpp
+     equalizer/qa_DFE.cpp
+ )
+ target_link_libraries(qa_digital_equalizer
+     PRIVATE
+     gr-digital-test-helpers
+ )
+ add_test(NAME qa_digital_equalizer COMMAND qa_digital_equalizer)
 
 # # OFDM tests
 # add_executable(qa_digital_ofdm
