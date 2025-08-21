@@ -75,20 +75,20 @@ add_test(NAME qa_digital_core COMMAND qa_digital_core)
  add_test(NAME qa_digital_equalizer COMMAND qa_digital_equalizer)
 
 # # OFDM tests
-# add_executable(qa_digital_ofdm
-#     ofdm/qa_CyclicPrefixer.cpp
-#     ofdm/qa_Serializer.cpp
-#     ofdm/qa_CarrierAllocator.cpp
+ add_executable(qa_digital_ofdm
+     ofdm/qa_CyclicPrefixer.cpp
+     ofdm/qa_Serializer.cpp
+     ofdm/qa_CarrierAllocator.cpp
 #     ofdm/qa_Equalizers.cpp
 #     ofdm/qa_ChanEst.cpp
 #     ofdm/qa_SyncSC.cpp
 #     ofdm/qa_OfdmE2E.cpp
-# )
-# target_link_libraries(qa_digital_ofdm
-#     PRIVATE
-#     gr-digital-test-helpers
-# )
-# add_test(NAME qa_digital_ofdm COMMAND qa_digital_ofdm)
+ )
+ target_link_libraries(qa_digital_ofdm
+     PRIVATE
+     gr-digital-test-helpers
+ )
+ add_test(NAME qa_digital_ofdm COMMAND qa_digital_ofdm)
 
 # # Packet tests
 # add_executable(qa_digital_packet
