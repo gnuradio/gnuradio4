@@ -2030,6 +2030,10 @@ protected:
             return {requestedWork, 0UZ, DONE};
         }
 
+        if (this->state() == lifecycle::State::ERROR) {
+            return {requestedWork, 0UZ, DONE};
+        }
+
         // TODO: finally remove me
         // const auto [minSyncIn, maxSyncIn, maxSyncAvailableIn, hasAsyncIn] = getPortLimits(inputPorts<PortType::STREAM>(&self()));
         // const auto [minSyncOut, maxSyncOut, maxSyncAvailableOut, hasAsyncOut] = getPortLimits(outputPorts<PortType::STREAM>(&self()));
@@ -2194,6 +2198,7 @@ protected:
 
         // if the block state changed to DONE, publish EOS tag on the next sample
         if (userReturnStatus == DONE) {
+            emitErrorMessageIfAny("workInternal() DONE", this->changeStateTo(lifecycle::State::REQUESTED_STOP));
             this->setAndNotifyState(lifecycle::State::STOPPED);
             publishEoS(outputSpans);
         }

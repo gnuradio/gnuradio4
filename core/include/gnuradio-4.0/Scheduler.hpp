@@ -204,7 +204,10 @@ public:
     }
 
     ~SchedulerBase() {
-        if (this->state() == lifecycle::RUNNING) {
+        if (this->state() == lifecycle::REQUESTED_PAUSE) {
+            std::ignore = this->changeStateTo(lifecycle::PAUSED);
+        }
+        if (lifecycle::isActive(this->state())) {
             if (auto e = this->changeStateTo(lifecycle::REQUESTED_STOP); !e) {
                 std::println(std::cerr, "Failed to stop execution at destruction of scheduler: {} ({})", e.error().message, e.error().srcLoc());
                 std::abort();
@@ -226,6 +229,11 @@ public:
         using enum lifecycle::State;
         const auto oldState = this->state();
         if (lifecycle::isActive(oldState)) { // need to stop running scheduler
+            if (this->state() == REQUESTED_PAUSE) {
+                if (auto result = this->changeStateTo(PAUSED); !result) {
+                    return std::unexpected(result.error());
+                }
+            }
             if (auto result = this->changeStateTo(REQUESTED_STOP); !result) {
                 return std::unexpected(result.error());
             }
@@ -594,9 +602,7 @@ protected:
 
             bool hasMessagesToProcess = msgToCount == 0UZ;
             if (hasMessagesToProcess) {
-                if (runnerID == 0UZ || nRunningJobs->value() == 0UZ) {
-                    this->processScheduledMessages(); // execute the scheduler- and Graph-specific message handler only once globally
-                }
+                this->processScheduledMessages(); // execute the scheduler- and Graph-specific message handler (atomic flag prevents concurrent execution)
 
                 // Zombies are cleaned per-thread, as we remove from the localBlockList as well.
                 // Cleaning zombies has low priority, so uses process_stream_to_message_ratio (a different ratio could be introduced)
@@ -605,7 +611,6 @@ protected:
                 adoptBlocks(runnerID, localBlockList);
 
                 std::ranges::for_each(localBlockList, &BlockModel::processScheduledMessages);
-                activeState = this->state();
                 msgToCount++;
             } else {
                 if (std::has_single_bit(process_stream_to_message_ratio.value)) {
@@ -614,6 +619,8 @@ protected:
                     msgToCount = (msgToCount + 1U) % process_stream_to_message_ratio.value;
                 }
             }
+
+            activeState = this->state();
 
             if (activeState == RUNNING) {
                 gr::work::Result result = traverseBlockListOnce(localBlockList);
@@ -659,8 +666,8 @@ protected:
         auto thisName = gr::meta::shorten_type_name(this->unique_name);
         gr::thread_pool::thread::setThreadName(std::format("WatchDog-{}", thisName));
 
-        const auto deadline      = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
-        const auto checkInterval = std::chrono::milliseconds(std::max(timeout_ms / 10UZ, 1UZ));
+        const auto deadline      = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeOut_ms);
+        const auto checkInterval = std::chrono::milliseconds(std::max(timeOut_ms / 10UZ, 1UZ));
         while (_valid.load(std::memory_order_acquire) && _nRunningJobs->value() == 0UZ && std::chrono::steady_clock::now() < deadline && lifecycle::isActive(this->state())) {
             std::this_thread::sleep_for(checkInterval);
         }
@@ -1109,6 +1116,34 @@ protected:
 
         auto [oldBlock, newBlockRaw] = targetGraph->replaceBlock(uniqueName, type, properties);
         makeZombie(std::move(oldBlock));
+
+        if (lifecycle::isActive(this->state())) {
+            const auto nBatches = _adoptionBlocks.size();
+            if (nBatches > 0) {
+                std::lock_guard guard(_adoptionBlocksMutex);
+                auto            blockAddress = reinterpret_cast<std::uintptr_t>(&newBlockRaw);
+                auto            runnerIndex  = (blockAddress / sizeof(void*)) % nBatches;
+                _adoptionBlocks[runnerIndex].push_back(newBlockRaw);
+
+                switch (newBlockRaw->state()) {
+                case STOPPED:
+                case IDLE: //
+                    this->emitErrorMessageIfAny("propertyCallbackReplaceBlock -> INITIALISED", newBlockRaw->changeStateTo(INITIALISED));
+                    this->emitErrorMessageIfAny("propertyCallbackReplaceBlock -> RUNNING", newBlockRaw->changeStateTo(RUNNING));
+                    break;
+                case INITIALISED: //
+                    this->emitErrorMessageIfAny("propertyCallbackReplaceBlock -> RUNNING", newBlockRaw->changeStateTo(RUNNING));
+                    break;
+                case RUNNING:
+                case REQUESTED_PAUSE:
+                case PAUSED:
+                case REQUESTED_STOP:
+                case ERROR: //
+                    this->emitErrorMessage("propertyCallbackReplaceBlock", std::format("Unexpected block state during replacement: {}", magic_enum::enum_name(newBlockRaw->state())));
+                    break;
+                }
+            }
+        }
 
         std::optional<Message> result = gr::Message{};
         result->endpoint              = scheduler::property::kBlockReplaced;
