@@ -366,10 +366,11 @@ public:
         }
 
         if (this->msgOut.buffer().streamBuffer.n_readers() == 0) {
-            // nobody is listening on messages -> convert errors to exceptions
+            // nobody is listening on messages -> log errors to stderr.
+            // N.B. cannot throw here: processScheduledMessages() is called from poolWorker() which is noexcept.
             for (const auto& msg : messagesFromChildren) {
                 if (!msg.data.has_value()) {
-                    throw gr::exception(std::format("scheduler {}: throwing ignored exception {:t}", this->name, msg.data.error()));
+                    std::println(std::cerr, "scheduler {}: unhandled error message: {:t}", this->name, msg.data.error());
                 }
             }
             return;
@@ -411,6 +412,26 @@ public:
         // * multiThreaded[Blocking] spawn two worker and block on 'waitDone()'
         waitDone();
         processScheduledMessages();
+
+        if (this->state() == ERROR) {
+            // Scheduler entered ERROR during execution (e.g. a block's work() returned ERROR).
+            // Pool workers have already exited but blocks were never told to stop.
+            // Transition all still-active blocks through the normal stop path so their
+            // stop() callbacks fire and resources are released.
+            graph::forEachBlock<TransparentBlockGroup>(*_graph, [this](auto& block) {
+                if (lifecycle::isActive(block->state())) {
+                    if (block->state() == REQUESTED_PAUSE) { // REQUESTED_PAUSE → REQUESTED_STOP is invalid; go through PAUSED first
+                        this->emitErrorMessageIfAny("runAndWait() ERROR REQUESTED_PAUSE -> PAUSED", block->changeStateTo(PAUSED));
+                    }
+                    this->emitErrorMessageIfAny("runAndWait() ERROR cleanup -> REQUESTED_STOP", block->changeStateTo(REQUESTED_STOP));
+                    if (!block->isBlocking()) {
+                        this->emitErrorMessageIfAny("runAndWait() ERROR cleanup -> STOPPED", block->changeStateTo(STOPPED));
+                    }
+                }
+            });
+            processScheduledMessages();
+            return std::unexpected(Error("runAndWait(): scheduler entered ERROR state during execution"));
+        }
 
         if (this->state() == RUNNING) {
             if (auto e = this->changeStateTo(REQUESTED_STOP); !e) {
@@ -700,6 +721,13 @@ protected:
 
     void stop() {
         using enum lifecycle::State;
+        // Wait for pool workers to finish before transitioning blocks.
+        // The scheduler state is already REQUESTED_STOP (set by changeStateTo before this callback),
+        // so workers will notice and exit. Without this wait, block stop() callbacks could run
+        // concurrently with workers still calling work() on those same blocks — risking
+        // use-after-free if a stop() callback releases resources that workInternal() accesses.
+        // In the runAndWait() path, workers have already exited, so this is a no-op.
+        waitDone();
         graph::forEachBlock<TransparentBlockGroup>(*_graph, [this](auto& block) {
             if (block->blockCategory() == ScheduledBlockGroup) {
                 auto* schedulerModel = dynamic_cast<SchedulerModel*>(block.get());
@@ -709,6 +737,9 @@ protected:
                     throw gr::exception(std::format("ScheduledBlockGroup is not a SchedulerModel {}", block->uniqueName()));
                 }
             } else {
+                if (block->state() == REQUESTED_PAUSE) { // REQUESTED_PAUSE → REQUESTED_STOP is invalid; go through PAUSED first
+                    this->emitErrorMessageIfAny("stop() REQUESTED_PAUSE -> PAUSED", block->changeStateTo(PAUSED));
+                }
                 this->emitErrorMessageIfAny("forEachBlock -> stop() -> LifecycleState", block->changeStateTo(REQUESTED_STOP));
                 if (!block->isBlocking()) { // N.B. no other thread/constraint to consider before shutting down
                     this->emitErrorMessageIfAny("forEachBlock -> stop() -> LifecycleState", block->changeStateTo(STOPPED));
@@ -927,9 +958,9 @@ protected:
                 break;
             case REQUESTED_STOP: // block will be deleted later
                 break;
-            case REQUESTED_PAUSE: // block will be deleted later
-                // There's no transition from REQUESTED_PAUSE to REQUESTED_STOP
-                // Will be moved to REQUESTED_STOP as soon as it's possible
+            case REQUESTED_PAUSE: // REQUESTED_PAUSE → REQUESTED_STOP is invalid; go through PAUSED first
+                this->emitErrorMessageIfAny("cleanupZombieBlocks REQUESTED_PAUSE -> PAUSED", (*it)->changeStateTo(PAUSED));
+                this->emitErrorMessageIfAny("cleanupZombieBlocks PAUSED -> REQUESTED_STOP", (*it)->changeStateTo(REQUESTED_STOP));
                 break;
             case PAUSED: // zombie was in REQUESTED_PAUSE and now finally in PAUSED. Can be stopped now.
                 // Will be deleted in a next zombie maintenance period
@@ -982,6 +1013,9 @@ protected:
     */
     void makeZombie(std::shared_ptr<BlockModel> block) {
         using enum lifecycle::State;
+        if (block->state() == REQUESTED_PAUSE) { // REQUESTED_PAUSE → REQUESTED_STOP is invalid; go through PAUSED first
+            this->emitErrorMessageIfAny("makeZombie", block->changeStateTo(PAUSED));
+        }
         if (block->state() == PAUSED || block->state() == RUNNING) {
             this->emitErrorMessageIfAny("makeZombie", block->changeStateTo(REQUESTED_STOP));
         }
@@ -1094,6 +1128,7 @@ protected:
     }
 
     std::optional<Message> propertyCallbackReplaceBlock([[maybe_unused]] std::string_view propertyName, Message message) {
+        using enum lifecycle::State;
         assert(propertyName == scheduler::property::kReplaceBlock);
         using namespace std::string_literals;
         const auto&         data       = message.data.value();
