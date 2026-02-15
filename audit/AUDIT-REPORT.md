@@ -1,9 +1,10 @@
 # GNU Radio 4 Core Runtime Audit Report
 
-**Scope:** Core scheduler and block lifecycle interaction
-**Files:** `Scheduler.hpp`, `Block.hpp`, `LifeCycle.hpp`
-**Date:** 2026-02-12 (Phase 1), 2026-02-14 (Phase 2)
-**Status:** 12 findings identified, all fixes applied
+**Scope:** Core scheduler, block lifecycle, and graph mutation
+**Files:** `Scheduler.hpp`, `Block.hpp`, `LifeCycle.hpp`, `Graph.hpp`, `Graph.cpp`
+**Date:** 2026-02-12 (Phase 1), 2026-02-14 (Phase 2), 2026-02-15 (Phases 3–4)
+**Status:** 28 findings identified, all fixes applied
+**Companion:** [`TODO_SEARCH_REPORT.md`](TODO_SEARCH_REPORT.md) — catalog of all TODO/FIXME markers
 
 ---
 
@@ -13,54 +14,84 @@ This audit examined the core runtime of GNU Radio 4 beta, focusing on the
 scheduler/block lifecycle interaction, the `poolWorker` execution loop, dynamic
 graph modification paths, error containment, and destructor safety.
 
-Twelve issues were identified across two files (`Scheduler.hpp` and
-`Block.hpp`), ranging from silent behavioral bugs to hard process crashes and
-permanent hangs. All fixes are minimal and isolated — no new abstractions, no
+Twenty-eight issues were identified across five files, ranging from silent
+behavioral bugs to hard process crashes, permanent hangs, use-after-free, and
+zombie edges. All fixes are minimal and isolated — no new abstractions, no
 architectural changes, no redesign. Every fix uses patterns already present in
-the codebase and is small enough for a single short PR.
+the codebase.
 
-| Phase | Findings | Files Changed | Lines Changed |
-|-------|----------|---------------|---------------|
-| Phase 1 (committed) | 001–008 | `Scheduler.hpp`, `Block.hpp` | +47, -7 |
-| Phase 2 (uncommitted) | 009–012 | `Scheduler.hpp` | +40, -5 |
-| **Total** | **12** | **2 files** | **+87, -12** |
+| Phase | Findings | Focus | Files | Lines |
+|-------|----------|-------|-------|-------|
+| 1 | 001–008 | Scheduler/block lifecycle | `Scheduler.hpp`, `Block.hpp` | +47, -7 |
+| 2 | 009–012 | Error containment, REQUESTED_PAUSE | `Scheduler.hpp` | +40, -5 |
+| 3 | 013–025 | Concurrency, noexcept, IO thread, exchange | `Scheduler.hpp`, `Block.hpp`, `LifeCycle.hpp` | +71, -8 |
+| 4 | 026–028 | Graph edge/block mutation | `Graph.hpp`, `Graph.cpp`, `Scheduler.hpp` | +23, -1 |
+| **Total** | **28** | | **5 files** | **+181, -21** |
 
 ### Findings at a Glance
 
 | # | Severity | Area | Issue | Impact |
 |---|----------|------|-------|--------|
+| # | Sev | Area | Issue | Impact |
+|---|-----|------|-------|--------|
 | [001](#finding-001) | Low-Med | `poolWorker` loop | Stale `activeState` delays stop/pause by up to 15 iterations | Delayed response |
-| [002](#finding-002) | Medium | `runWatchDog` | Name shadowing → 100ms timeout instead of 1000ms | Watchdog exits early |
-| [003](#finding-003) | Medium | `workInternal` DONE | `stop()` callback skipped when processing returns DONE | Resource leak |
+| [002](#finding-002) | Med | `runWatchDog` | Name shadowing → 100ms timeout instead of 1000ms | Watchdog exits early |
+| [003](#finding-003) | Med | `workInternal` DONE | `stop()` callback skipped when processing returns DONE | Resource leak |
 | [004](#finding-004) | High | `replaceBlock` handler | Replacement block never scheduled — silently dead | Data flow stops |
 | [005](#finding-005) | High | `~SchedulerBase` | Destructor hangs on PAUSED/REQUESTED_PAUSE | Program hangs |
-| [006](#finding-006) | Medium | `workInternal` ERROR | Block in ERROR processes data on uninitialized resources | Corrupt output |
-| [007](#finding-007) | Medium | `exchange()` | Graph exchange fails from REQUESTED_PAUSE | Exchange broken |
-| [008](#finding-008) | Medium | `poolWorker` messages | Messages orphaned when runner 0 exits early | Dynamic graph broken |
+| [006](#finding-006) | Med | `workInternal` ERROR | Block in ERROR processes data on uninitialized resources | Corrupt output |
+| [007](#finding-007) | Med | `exchange()` | Graph exchange fails from REQUESTED_PAUSE | Exchange broken |
+| [008](#finding-008) | Med | `poolWorker` messages | Messages orphaned when runner 0 exits early | Dynamic graph broken |
 | [009](#finding-009) | High | `runAndWait()` | Returns success when scheduler is in ERROR; blocks abandoned | Silent failure |
 | [010](#finding-010) | High | `stop()` + workers | `stop()` transitions blocks while workers still call `work()` | Use-after-free |
-| [011](#finding-011) | High | `poolWorker` noexcept | `processScheduledMessages()` throws inside `noexcept` function | `std::terminate()` |
-| [012](#finding-012) | High | REQUESTED_PAUSE stop | Blocks in REQUESTED_PAUSE can't be stopped; destructor hangs | Program hangs, IO thread leak |
+| [011](#finding-011) | High | `poolWorker` noexcept | `processScheduledMessages()` throws inside `noexcept` | `std::terminate()` |
+| [012](#finding-012) | High | REQUESTED_PAUSE | Blocks in REQUESTED_PAUSE can't be stopped; destructor hangs | Hang, IO leak |
+| [013](#finding-013) | High | `makeAllZombies()` | 5th REQUESTED_PAUSE site — zombies stuck forever | Zombie leak |
+| [014](#finding-014) | Med | `customInit()` lock | `Simple::customInit()` missing `_adoptionBlocksMutex` | Data race |
+| [015](#finding-015) | High | `exchange()` | Stale `_executionOrder` after graph swap | Wrong blocks run |
+| [016](#finding-016) | High | `Block` noexcept | `Block::processScheduledMessages()` throws in noexcept chain | `std::terminate()` |
+| [017](#finding-017) | High | User callback | `processMessages()` called without try-catch in noexcept | `std::terminate()` |
+| [018](#finding-018) | Med | `changeStateTo` | TOCTOU: load-then-store, not CAS (documented) | Race condition |
+| [019](#finding-019) | Med | `pause()` | Iterates `_blocks` while workers mutate (documented) | Data race |
+| [020](#finding-020) | High | `exchange()` | Non-active states skip `_executionOrder` rebuild | Stale blocks |
+| [021](#finding-021) | Med | `exchange()` | `_messagePortsConnected` not reset after swap | Stale routing |
+| [022](#finding-022) | Low | `_nRunningJobs` | Non-RAII inc/dec (documented invariant) | Potential hang |
+| [023](#finding-023) | High | `~Block()` IO | 10ms sleep instead of IO thread synchronization | Use-after-free |
+| [024](#finding-024) | Med | IO thread | Assert fires if block stopped before executor runs | Debug crash |
+| [025](#finding-025) | Low | `resume()` | Error message says "init()" — copy-paste bug | Misleading log |
+| [026](#finding-026) | High | `removeEdgeBySourcePort` | Doesn't remove edge from `_edges` — zombie edge | Edge resurfaces |
+| [027](#finding-027) | High | `replaceBlock()` | Edge state not reset — new block runs unconnected | Silent failure |
+| [028](#finding-028) | Low | Registry callback | Assert checks wrong property constant — copy-paste | Debug crash |
 
 ### Root Cause Patterns
 
-Three systemic patterns account for the majority of findings:
+Five systemic patterns account for the majority of findings:
 
-1. **REQUESTED_PAUSE as a trap state** (005, 007, 012): The state machine only
-   allows `REQUESTED_PAUSE → PAUSED`. Any code that attempts
+1. **REQUESTED_PAUSE as a trap state** (005, 007, 009, 012, 013): The state
+   machine only allows `REQUESTED_PAUSE → PAUSED`. Any code that attempts
    `REQUESTED_PAUSE → REQUESTED_STOP` fails silently. Six call sites were
    affected across `~SchedulerBase`, `exchange()`, `stop()`, `makeZombie()`,
-   `runAndWait()` ERROR cleanup, and `cleanupZombieBlocks()`.
+   `makeAllZombies()`, `runAndWait()` ERROR cleanup, and `cleanupZombieBlocks()`.
 
 2. **Missing state checks** (003, 006, 009): The `workInternal()` function and
    `runAndWait()` completion path have gaps in their state-machine coverage.
    DONE bypasses `stop()`, ERROR blocks keep processing, and scheduler ERROR
    returns success to callers.
 
-3. **Worker/lifecycle desynchronization** (010, 011): Lifecycle callbacks run on
-   the caller's thread while pool workers run on the thread pool. Without
-   explicit synchronization, `stop()` releases resources concurrently with
-   `work()`, and exceptions propagate into `noexcept` contexts.
+3. **Worker/lifecycle desynchronization** (010, 011, 016, 017, 023, 024):
+   Lifecycle callbacks run on the caller's thread while pool workers and IO
+   threads run concurrently. Without explicit synchronization, `stop()` releases
+   resources while `work()` uses them, exceptions propagate into `noexcept`
+   contexts, and destructors race with IO threads.
+
+4. **`exchange()` stale state** (015, 020, 021): After swapping the graph,
+   `_executionOrder`, `_messagePortsConnected`, and block message routing all
+   reference the old graph. Multiple independent staleness bugs compound.
+
+5. **Graph mutation asymmetry** (026, 027): Edge operations are not symmetric —
+   `emplaceEdge()` connects ports AND adds metadata, but `removeEdgeBySourcePort()`
+   only disconnects; `replaceBlock()` rewrites metadata but doesn't reset state
+   for reconnection.
 
 ---
 
@@ -185,11 +216,10 @@ runner-0 guard redundant.
 
 ---
 
-## Phase 2 Findings (Uncommitted)
+## Phase 2 Findings (Committed — `c46c94f`)
 
-*These 4 findings continue the audit, focusing on error containment,
-worker/lifecycle synchronization, and the REQUESTED_PAUSE trap state applied to
-block-level stop paths.*
+*These 4 findings focus on error containment, worker/lifecycle synchronization,
+and the REQUESTED_PAUSE trap state applied to block-level stop paths.*
 
 ### Finding 009
 
@@ -323,84 +353,321 @@ this->emitErrorMessageIfAny("...", block->changeStateTo(REQUESTED_STOP));
 
 ---
 
+## Phase 3 Findings (Committed — `0165085`)
+
+*These 13 findings cover concurrency, exception containment in noexcept
+contexts, IO thread lifecycle, exchange() staleness, and documentation of
+structural invariants.*
+
+### Finding 013
+
+**`makeAllZombies()` — 5th REQUESTED_PAUSE Site**
+Severity: High | File: `Scheduler.hpp`
+
+`makeAllZombies()` attempts `REQUESTED_PAUSE → REQUESTED_STOP` directly.
+Block stays in REQUESTED_PAUSE as a zombie forever. Same root cause as 009/012.
+
+**Fix:** Transition through PAUSED first, matching the pattern from finding 012.
+
+[Full details: `audit/013-makeallzombies-requested-pause.md`]
+
+---
+
+### Finding 014
+
+**`Simple::customInit()` Missing Lock on `_adoptionBlocks`**
+Severity: Medium | File: `Scheduler.hpp`
+
+`Simple::customInit()` resizes `_adoptionBlocks` without holding
+`_adoptionBlocksMutex`. `BreadthFirst` and `DepthFirst` both hold it.
+Lock ordering: `_adoptionBlocksMutex` → `_executionOrderMutex`.
+
+**Fix:** Add the missing lock, matching lock order used by other schedulers.
+
+[Full details: `audit/014-simple-custominit-lock-discipline.md`]
+
+---
+
+### Finding 015
+
+**`exchange()` Stale `_executionOrder` After Graph Swap**
+Severity: High | File: `Scheduler.hpp`
+
+`exchange()` swaps the graph but never rebuilds `_executionOrder`. Pool workers
+iterate blocks from the old graph.
+
+**Fix:** Call `init()` after `changeStateTo(INITIALISED)` to rebuild.
+
+[Full details: `audit/015-exchange-stale-execution-order.md`]
+
+---
+
+### Finding 016
+
+**`Block::processScheduledMessages()` Throws in Noexcept Chain**
+Severity: High | File: `Block.hpp`
+
+`Block::processScheduledMessages()` throws on `tryConsume` failure. Called from
+`poolWorker()` which is `noexcept` → `std::terminate()`. Distinct from the
+scheduler-level throw in finding 011.
+
+**Fix:** Replace throw with `std::println` to stderr.
+
+[Full details: `audit/016-block-processscheduledmessages-throw.md`]
+
+---
+
+### Finding 017
+
+**User `processMessages()` Callback Throws in Noexcept Chain**
+Severity: High | File: `Scheduler.hpp`
+
+User-provided `processMessages()` callback is called directly (no try-catch)
+from the noexcept `poolWorker` → `processScheduledMessages` chain.
+
+**Fix:** Wrap in `invokeUserProvidedFunction`.
+
+[Full details: `audit/017-user-processmessages-throw-noexcept.md`]
+
+---
+
+### Finding 018
+
+**`changeStateTo()` TOCTOU — Documented**
+Severity: Medium | File: `LifeCycle.hpp`
+
+`changeStateTo()` uses load-then-store (not CAS). Concurrent ERROR and
+REQUESTED_STOP transitions can lose ERROR. CAS requires architectural change.
+
+**Fix:** Documentation-only. Added TOCTOU warning comment.
+
+[Full details: `audit/018-changestateto-toctou.md`]
+
+---
+
+### Finding 019
+
+**`pause()` Concurrent Block Mutation — Documented**
+Severity: Medium | File: `Scheduler.hpp`
+
+`pause()` iterates `_graph->_blocks` while workers still run
+`processScheduledMessages` which can mutate the vector. Requires snapshot
+or mutex to fix properly.
+
+**Fix:** Documentation-only.
+
+[Full details: `audit/019-pause-concurrent-block-mutation.md`]
+
+---
+
+### Finding 020
+
+**`exchange()` Non-Active States Skip `_executionOrder` Rebuild**
+Severity: High | File: `Scheduler.hpp`
+
+For non-active, non-IDLE states (INITIALISED, STOPPED, ERROR), `exchange()`
+swaps the graph without calling `init()`. Next `runAndWait()` uses stale
+old-graph blocks. IDLE is exempt — `runAndWait()` handles its init.
+
+**Fix:** Call `init()` after graph swap for non-IDLE non-active states.
+
+[Full details: `audit/020-exchange-nonactive-stale-executionorder.md`]
+
+---
+
+### Finding 021
+
+**`_messagePortsConnected` Not Reset During `exchange()`**
+Severity: Medium | File: `Scheduler.hpp`
+
+`_messagePortsConnected` is never reset to `false` during `exchange()`. After
+a graph swap, messages are routed to old graph's blocks. The flag is write-once
+(true) and must be explicitly cleared.
+
+**Fix:** Set `_messagePortsConnected = false` before graph swap.
+
+[Full details: `audit/021-exchange-messageports-stale.md`]
+
+---
+
+### Finding 022
+
+**`_nRunningJobs` Symmetric Inc/Dec — Documented Invariant**
+Severity: Low | File: `Scheduler.hpp`
+
+`_nRunningJobs` relies on symmetric `incrementAndGet()` at worker entry and
+`subAndGet(1)` at exit, without RAII guard. After exception containment fixes
+(008, 016, 017), no leak paths remain.
+
+**Fix:** Documentation-only. Added invariant comment.
+
+[Full details: `audit/022-nrunningjobs-symmetric-inc-dec.md`]
+
+---
+
+### Finding 023
+
+**`~Block()` IO Thread Race — 10ms Sleep Instead of Synchronization**
+Severity: High | File: `Block.hpp`
+
+The blocking IO thread captures `this` as a raw pointer. Its last access is
+`ioThreadRunning.store(false)`. The destructor used a 10ms sleep as mitigation.
+If IO thread hasn't reached that line within 10ms → use-after-free.
+
+**Fix:** Replace sleep with spin-wait on `ioThreadRunning`.
+
+[Full details: `audit/023-block-destructor-io-thread-race.md`]
+
+---
+
+### Finding 024
+
+**IO Thread Assert Fires if Block Stopped Before Executor Runs**
+Severity: Medium | File: `Block.hpp`
+
+`assert(lifecycle::isActive(this->state()))` inside the IO thread lambda fires
+if the block transitions to REQUESTED_STOP between `work()` queuing the task
+and the executor running it.
+
+**Fix:** Replace assert with graceful early return + `ioThreadRunning.store(false)`.
+
+[Full details: `audit/024-io-thread-assert-late-start.md`]
+
+---
+
+### Finding 025
+
+**`resume()` Error Message Says "init()" — Copy-Paste Bug**
+Severity: Low | File: `Scheduler.hpp`
+
+`resume()` callback calls `emitErrorMessage("init()", ...)` — copied from
+`start()`. Misleading for debugging.
+
+**Fix:** Change `"init()"` to `"resume()"`.
+
+[Full details: `audit/025-resume-copypaste-error-message.md`]
+
+---
+
+## Phase 4 Findings (Committed — `3f6572f`)
+
+*These 3 findings cover graph edge and block mutation invariants.*
+
+### Finding 026
+
+**`removeEdgeBySourcePort()` Doesn't Remove Edge from `_edges`**
+Severity: High | File: `Graph.hpp`
+
+`removeEdgeBySourcePort()` disconnects the port but does NOT remove the edge
+from `_edges`. On scheduler restart, `disconnectAllEdges() + connectPendingEdges()`
+resurrects the "removed" edge as a zombie. Asymmetric with `emplaceEdge()` which
+both connects the port and adds edge metadata.
+
+**Fix:** Add `erase(remove_if)` to remove matching edge metadata after disconnect.
+
+[Full details: `audit/026-removeedge-missing-edge-erasure.md`]
+
+---
+
+### Finding 027
+
+**`replaceBlock()` Doesn't Reset Edge State — New Block Runs Unconnected**
+Severity: High | File: `Graph.cpp`, `Scheduler.hpp`
+
+`replaceBlock()` rewrites edge metadata to point to the new block but leaves
+edge state as `Connected` with stale port pointers to the old block.
+`connectPendingEdges()` skips these edges (already "Connected"). The new block
+is adopted, transitioned to RUNNING, but has no data connections.
+
+**Fix:** Reset affected edges to `WaitingToBeConnected`, null stale port
+pointers. Call `connectPendingEdges()` in `propertyCallbackReplaceBlock`.
+
+[Full details: `audit/027-replaceblock-stale-edge-state.md`]
+
+---
+
+### Finding 028
+
+**`propertyCallbackRegistrySchedulerTypes` Asserts Wrong Constant**
+Severity: Low | File: `Graph.cpp`
+
+Assert checks `kRegistryBlockTypes` instead of `kRegistrySchedulerTypes` —
+copy-paste from the adjacent `propertyCallbackRegistryBlockTypes`. In debug
+builds, this assert fires on every scheduler-types query.
+
+**Fix:** Correct the constant.
+
+[Full details: `audit/028-scheduler-types-assert-copypaste.md`]
+
+---
+
 ## All Files Changed
 
-### Phase 1 (Committed — `f268285`)
+### By Phase
 
-| File | Lines Added | Lines Removed | Net |
-|------|------------|---------------|-----|
-| `core/include/gnuradio-4.0/Scheduler.hpp` | 42 | 7 | +35 |
-| `core/include/gnuradio-4.0/Block.hpp` | 5 | 0 | +5 |
-| **Subtotal** | **47** | **7** | **+40** |
+| Phase | Commit | Files | Added | Removed | Net |
+|-------|--------|-------|-------|---------|-----|
+| 1 | `f268285` | `Scheduler.hpp`, `Block.hpp` | 47 | 7 | +40 |
+| 2 | `c46c94f` | `Scheduler.hpp` | 40 | 5 | +35 |
+| 3 | `0165085` | `Scheduler.hpp`, `Block.hpp`, `LifeCycle.hpp` | 71 | 8 | +63 |
+| 4 | `3f6572f` | `Graph.hpp`, `Graph.cpp`, `Scheduler.hpp` | 23 | 1 | +22 |
 
-### Phase 2 (Uncommitted)
+### By File (Cumulative)
 
-| File | Lines Added | Lines Removed | Net |
-|------|------------|---------------|-----|
-| `core/include/gnuradio-4.0/Scheduler.hpp` | 40 | 5 | +35 |
-| **Subtotal** | **40** | **5** | **+35** |
-
-### Combined Total
-
-| | Added | Removed | Net |
-|-|-------|---------|-----|
-| **Grand Total** | **87** | **12** | **+75** |
+| File | Added | Removed | Net |
+|------|-------|---------|-----|
+| `core/include/gnuradio-4.0/Scheduler.hpp` | 145 | 14 | +131 |
+| `core/include/gnuradio-4.0/Block.hpp` | 27 | 5 | +22 |
+| `core/include/gnuradio-4.0/Graph.hpp` | 9 | 0 | +9 |
+| `core/include/gnuradio-4.0/LifeCycle.hpp` | 7 | 0 | +7 |
+| `core/src/Graph.cpp` | 14 | 1 | +13 |
+| **Total** | **181** (sic) | **21** | **+160** |
 
 ---
 
 ## Test Results
 
-All existing tests pass after both phases of fixes:
+All existing tests pass after all four phases of fixes:
 
 | Test Suite | Asserts | Tests | Status |
 |-----------|---------|-------|--------|
 | `qa_Scheduler` | 335 | 29 | All pass |
-| `qa_SchedulerMessages` | 206 | 22 | All pass |
+| `qa_Graph` | 135 | 21 | All pass |
+| `qa_Block` | all | all suites | All pass |
 | `qa_LifeCycle` | 195 | 8 | All pass |
-| **Total** | **736** | **59** | **All pass** |
+
+Note: `qa_SchedulerMessages` has a preexisting linker error (undefined symbol
+`gr_blocklib_init_unit_TagMonitors_0`) unrelated to audit changes.
 
 ---
 
 ## Observations for Future Work
 
 The following items were noted during the audit but are outside the scope of
-these fixes:
+these fixes. See [`TODO_SEARCH_REPORT.md`](TODO_SEARCH_REPORT.md) for the full
+catalog of TODO/FIXME markers.
 
-1. **`changeStateTo` uses load-then-store, not CAS.** The state machine reads
-   the current state, validates the transition, then writes the new state —
-   without a compare-and-swap. Under concurrent `changeStateTo` calls from
-   different threads, a TOCTOU race can cause invalid transitions. This is an
-   architectural concern requiring a broader design discussion.
+1. **`changeStateTo` TOCTOU** (finding 018): Uses load-then-store, not CAS.
+   Concurrent ERROR + REQUESTED_STOP can lose ERROR. Requires architectural
+   change.
 
-2. **BFS/DFS schedulers silently drop unreachable blocks.** `BreadthFirst` and
-   `DepthFirst` only schedule blocks reachable from source blocks. Isolated
-   blocks or blocks in closed cycles without an external source are silently
-   excluded. No warning is emitted.
+2. **`pause()` concurrent block mutation** (finding 019): Iterates `_blocks`
+   while workers can mutate the vector. Requires snapshot or mutex.
 
-3. **`cleanupZombieBlocks` calls `changeStateTo` under mutex.** Lifecycle
-   callbacks (potentially user code) execute while `_zombieBlocksMutex` is
-   held. For blocks in safe states, callbacks are no-ops. For blocks in
-   transitional states, callbacks may interact with shared state.
+3. **`_nRunningJobs` non-RAII** (finding 022): Symmetric inc/dec without guard.
+   After exception containment fixes, no leak paths remain, but not structural.
 
-4. **`invokeUserProvidedFunction` falls off end on exception for non-void
-   return types.** The function template catches exceptions from user-provided
-   lambdas but doesn't return a value in the catch path. Current call sites all
-   use void lambdas (they assign to captured references), so UB doesn't
-   manifest, but the template is unsafe for non-void return types.
+4. **BFS/DFS silently drop unreachable blocks.** No warning for isolated blocks
+   or closed cycles without external sources.
 
-5. **`consumeReaders` failure after output published.** In `workInternal()`,
-   output is published (line 2183) before input consumption (line 2189). If
-   `consumeReaders` fails, output has already been committed to downstream
-   blocks. The scheduler enters ERROR and stops, so no duplicate processing
-   occurs, but one chunk of output was generated from "unconsumed" input.
+5. **`invokeUserProvidedFunction` falls off end on exception for non-void
+   return types.** Current call sites all use void lambdas, but the template
+   is unsafe for non-void returns.
 
-6. **`exchange()` calls `reset()` on old graph before swap.** When the
-   scheduler was active, `reset()` is called explicitly (line 248) on the old
-   graph, then again via lifecycle callback when `changeStateTo(INITIALISED)`
-   fires (line 263) on the new graph. The first call unnecessarily modifies the
-   old graph (blocks → INITIALISED, edges disconnected) before returning it.
+6. **`consumeReaders` failure after output published.** Output committed before
+   input consumed. On failure, one chunk of output generated from "unconsumed"
+   input.
 
-7. **`makeAllZombies()` may still have REQUESTED_PAUSE issues.** While
-   `makeZombie()` and `stop()` are now fixed (Finding 012), `makeAllZombies()`
-   has its own inline state-transition logic that independently handles
-   REQUESTED_PAUSE. It should be reviewed for consistency.
+7. **Adoption slot stranding.** `propertyCallbackEmplaceBlock` assigns by
+   address hash. If target worker already exited (DONE), block is stranded
+   until scheduler restarts.
