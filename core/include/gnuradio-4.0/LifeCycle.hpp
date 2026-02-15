@@ -179,6 +179,13 @@ public:
         return *this;
     }
 
+    // N.B. This method uses load-then-store (NOT compare-and-swap). Under concurrent calls,
+    // the last writer wins and earlier transitions may be silently overwritten. In particular,
+    // a concurrent ERROR transition can be lost if another thread stores REQUESTED_STOP.
+    // The scheduler design assumes single-writer for lifecycle transitions except for:
+    //   - poolWorker → ERROR (from work() returning ERROR)
+    //   - external thread → REQUESTED_STOP/REQUESTED_PAUSE
+    // These can race, but ERROR→REQUESTED_STOP is the only dangerous combination.
     [[nodiscard]] std::expected<void, Error> changeStateTo(State newState, const std::source_location location = std::source_location::current()) {
         State oldState;
         if constexpr (storageType == StorageType::ATOMIC) {

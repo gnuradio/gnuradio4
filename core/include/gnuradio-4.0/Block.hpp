@@ -852,7 +852,12 @@ public:
             emitErrorMessageIfAny("~Block()", this->changeStateTo(lifecycle::State::REQUESTED_STOP));
         }
         if constexpr (blockingIO) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            // Wait for the IO thread to finish. It captures `this` as a raw pointer, so
+            // destruction must not complete while the IO thread is still executing.
+            // ioThreadRunning is set to false as the IO thread's last access to `this`.
+            while (ioThreadRunning.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
         }
 
         // wait for done
@@ -1248,13 +1253,16 @@ public:
             }
             ReaderSpanLike auto inSpan = inPort.streamReader().get(available);
             if constexpr (traits::block::can_processMessagesForPortReaderSpan<Derived, TPort>) {
-                self().processMessages(inPort, inSpan);
+                // N.B. processScheduledMessages() is called from poolWorker() which is noexcept — user callbacks must not throw.
+                // Wrap in invokeUserProvidedFunction to match the exception safety of processBulk/processOne.
+                invokeUserProvidedFunction("processMessages(ReaderSpan)", [&] { self().processMessages(inPort, inSpan); });
                 // User could have consumed the span in the custom processMessages handler
                 std::ignore = inSpan.tryConsume(inSpan.size());
             } else if constexpr (traits::block::can_processMessagesForPortStdSpan<Derived, TPort>) {
-                self().processMessages(inPort, static_cast<std::span<const Message>>(inSpan));
+                invokeUserProvidedFunction("processMessages(std::span)", [&] { self().processMessages(inPort, static_cast<std::span<const Message>>(inSpan)); });
+                // tryConsume may fail if the user's processMessages() already consumed the span (same as line above for ReaderSpan path).
                 if (auto consumed = inSpan.tryConsume(inSpan.size()); !consumed) {
-                    throw gr::exception(std::format("Block {}::processScheduledMessages() could not consume the messages from the message port", unique_name));
+                    std::println(stderr, "Block {}::processScheduledMessages() could not consume the messages from the message port", unique_name);
                 }
             } else {
                 return;
@@ -2281,7 +2289,11 @@ public:
                 }
 
                 executor->execute([this]() {
-                    assert(lifecycle::isActive(this->state()));
+                    if (!lifecycle::isActive(this->state())) {
+                        // Block was stopped before the executor ran this task (e.g. rapid stop after work()).
+                        ioThreadRunning.store(false);
+                        return;
+                    }
                     gr::thread_pool::thread::setThreadName(gr::meta::shorten_type_name(this->unique_name));
 
                     lifecycle::State actualThreadState = this->state();

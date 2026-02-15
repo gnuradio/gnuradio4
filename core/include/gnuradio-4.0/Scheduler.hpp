@@ -132,6 +132,11 @@ protected:
     TProfiler                     _profiler{};
     ProfileHandle                 _profilerHandler{_profiler.forThisThread()};
     std::shared_ptr<TaskExecutor> _pool{gr::thread_pool::Manager::instance().defaultCpuPool()};
+    // Invariant: _nRunningJobs == 0 when no pool workers are active. Relies on symmetric
+    // incrementAndGet() at poolWorker entry (line ~607) and subAndGet(1) at exit (line ~689).
+    // Not RAII-guarded — if a worker exits without decrementing, waitDone() hangs forever.
+    // Asserted == 0 at start() (line ~583). After exception containment (findings 008/016/017),
+    // no code path in poolWorker() can exit without decrementing.
     std::shared_ptr<gr::Sequence> _nRunningJobs = std::make_shared<gr::Sequence>();
     std::recursive_mutex          _executionOrderMutex; // only used when modifying and copying the graph->local job list
     std::shared_ptr<JobLists>     _executionOrder = std::make_shared<JobLists>();
@@ -141,7 +146,9 @@ protected:
 
     // for blocks that were added while scheduler was running. They need to be adopted by a thread
     std::mutex _adoptionBlocksMutex;
-    // fixed-sized vector indexed by runnerId. Cheaper than a map.
+    // Invariant: _adoptionBlocks.size() == _executionOrder->size() (number of worker batches).
+    // Both must be resized together under both _adoptionBlocksMutex and _executionOrderMutex.
+    // Indexed by runnerId. Cheaper than a map.
     std::vector<std::vector<std::shared_ptr<BlockModel>>> _adoptionBlocks;
 
     MsgPortOutForChildren    _toChildMessagePort;
@@ -248,6 +255,7 @@ public:
             reset(); // reset internal states
         }
 
+        _messagePortsConnected = false; // old connections invalid for new graph; re-established by init() → connectBlockMessagePorts()
         auto oldGraph = std::exchange(_graph, std::move(newGraph));
 
         if ((option != profiling::Options{})) { // need to update profiler
@@ -263,6 +271,10 @@ public:
             if (auto result = this->changeStateTo(INITIALISED); !result) { // Need to go to INITIALISED first
                 return std::unexpected(result.error());
             }
+            // STOPPED → INITIALISED triggers reset() but NOT init(). init() is only called for IDLE → INITIALISED.
+            // We must call init() explicitly to rebuild _executionOrder (via customInit()) and reconnect
+            // message ports (via connectBlockMessagePorts()) for the new graph.
+            init();
             if (auto result = this->changeStateTo(RUNNING); !result) {
                 return std::unexpected(result.error());
             }
@@ -279,6 +291,12 @@ public:
                     return std::unexpected(result.error());
                 }
             }
+        } else if (oldState != IDLE) {
+            // Non-active, non-IDLE states (INITIALISED, STOPPED, ERROR): _executionOrder was built
+            // for the old graph and must be rebuilt for the new one. init() calls customInit() which
+            // rebuilds _executionOrder, and connectBlockMessagePorts() for message routing.
+            // IDLE is exempt because runAndWait()'s IDLE→INITIALISED transition triggers init().
+            init();
         }
         return oldGraph;
     }
@@ -548,6 +566,9 @@ protected:
 
         std::lock_guard lock(_executionOrderMutex);
 
+        // N.B. if a block's start() callback throws, it enters ERROR and the failure is logged
+        // via emitErrorMessageIfAny, but start() continues with remaining blocks. Pool workers
+        // will call work() on ERROR blocks — workInternal() returns DONE for non-RUNNING blocks.
         graph::forEachBlock<TransparentBlockGroup>(*_graph, [this](auto& block) { //
             if (block->blockCategory() == ScheduledBlockGroup) {
                 // We don't simply move to RUNNING, as schedulers block. This code path
@@ -755,6 +776,10 @@ protected:
 
     void pause() {
         using enum lifecycle::State;
+        // N.B. Unlike stop(), pause() does NOT call waitDone() — workers remain alive (sleeping in PAUSED).
+        // This means forEachBlock runs concurrently with pool workers' processScheduledMessages().
+        // If a message-driven block mutation (emplace/remove) modifies _graph->_blocks during iteration,
+        // iterator invalidation is possible. In practice, block mutations during pause are rare.
         graph::forEachBlock<TransparentBlockGroup>(*_graph, [this](auto& block) {
             this->emitErrorMessageIfAny("pause() -> LifecycleState", block->changeStateTo(REQUESTED_PAUSE));
             if (!block->isBlocking()) { // N.B. no other thread/constraint to consider before shutting down
@@ -771,7 +796,7 @@ protected:
         using enum lifecycle::State;
         auto result = connectPendingEdges();
         if (!result) {
-            this->emitErrorMessage("init()", "Failed to connect blocks in graph");
+            this->emitErrorMessage("resume()", "Failed to connect blocks in graph");
         }
         graph::forEachBlock<TransparentBlockGroup>(*_graph, [this](auto& block) { this->emitErrorMessageIfAny("resume() -> LifecycleState", block->changeStateTo(RUNNING)); });
         if constexpr (requires(Derived& d) { d.customResume(); }) {
@@ -810,6 +835,8 @@ protected:
             if (nBatches > 0) {
                 std::lock_guard guard(_adoptionBlocksMutex);
                 // pseudo-randomize which thread gets it
+                // N.B. If the target worker already exited (all its blocks returned DONE), the
+                // new block is stranded in that worker's adoption slot until the scheduler restarts.
                 auto blockAddress = reinterpret_cast<std::uintptr_t>(&newBlock);
                 auto runnerIndex  = (blockAddress / sizeof(void*)) % nBatches;
                 _adoptionBlocks[runnerIndex].push_back(newBlock);
@@ -997,6 +1024,12 @@ protected:
         assert(_adoptionBlocks.size() > runnerID);
         auto& newBlocks = _adoptionBlocks[runnerID];
 
+        // Blocks should have been transitioned to RUNNING by propertyCallbackEmplaceBlock/ReplaceBlock.
+        // If not, they'll be work()'d in a non-RUNNING state (harmless but wasteful — work() returns early).
+        for ([[maybe_unused]] const auto& block : newBlocks) {
+            assert(block->state() == lifecycle::RUNNING && "adopted block must be RUNNING before entering worker rotation");
+        }
+
         localBlockList.reserve(localBlockList.size() + newBlocks.size());
         localBlockList.insert(localBlockList.end(), newBlocks.begin(), newBlocks.end());
         newBlocks.clear();
@@ -1044,8 +1077,10 @@ protected:
 
         for (auto& block : this->_graph->blocks()) {
             switch (block->state()) {
+            case REQUESTED_PAUSE: // REQUESTED_PAUSE → REQUESTED_STOP is invalid; go through PAUSED first
+                this->emitErrorMessageIfAny("makeAllZombies REQUESTED_PAUSE -> PAUSED", block->changeStateTo(PAUSED));
+                [[fallthrough]];
             case RUNNING:
-            case REQUESTED_PAUSE:
             case PAUSED: //
                 this->emitErrorMessageIfAny("makeAllZombies", block->changeStateTo(REQUESTED_STOP));
                 break;
@@ -1211,6 +1246,7 @@ struct Simple : SchedulerBase<Simple<execution, TProfiler>, execution, TProfiler
         default:;
         }
 
+        std::lock_guard guard(this->_adoptionBlocksMutex); // must hold before modifying _adoptionBlocks (matches BreadthFirst/DepthFirst)
         std::lock_guard lock(this->_executionOrderMutex);
         this->_adoptionBlocks.clear();
         this->_adoptionBlocks.resize(n_batches);
@@ -1314,6 +1350,11 @@ detecting cycles and blocks which can be reached from several source blocks.)"">
             }
         }
 
+        // Blocks not reachable from any source (e.g. disconnected blocks) are silently excluded.
+        // This is intentional: disconnected blocks have no data path and should not be scheduled.
+        // If all blocks are disconnected, blockList is empty, and the scheduler starts with zero workers.
+        assert(blockList.size() <= flatGraph.blocks().size() && "BFS visited more blocks than exist in the flattened graph");
+
         const std::size_t n_batches = (execution == ExecutionPolicy::multiThreaded) ? std::min(static_cast<std::size_t>(this->_pool->maxThreads()), blockList.size()) : 1UZ;
 
         std::lock_guard guard(this->_adoptionBlocksMutex);
@@ -1376,6 +1417,9 @@ struct DepthFirst : SchedulerBase<DepthFirst<execution, TProfiler>, execution, T
         for (const auto& src : sourceBlocks) {
             dfs(src);
         }
+
+        // Blocks not reachable from any source (e.g. disconnected blocks) are silently excluded.
+        assert(blockList.size() <= flatGraph.blocks().size() && "DFS visited more blocks than exist in the flattened graph");
 
         const std::size_t n_batches = (execution == ExecutionPolicy::multiThreaded) ? std::min(static_cast<std::size_t>(this->_pool->maxThreads()), blockList.size()) : 1UZ;
 
