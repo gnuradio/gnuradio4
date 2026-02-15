@@ -40,12 +40,24 @@ std::pair<std::shared_ptr<BlockModel>, std::shared_ptr<BlockModel>> Graph::repla
     addBlock(newBlock);
 
     for (auto& edge : _edges) {
+        bool touched = false;
         if (edge._sourceBlock == *it) {
             edge._sourceBlock = newBlock;
+            touched           = true;
         }
 
         if (edge._destinationBlock == *it) {
             edge._destinationBlock = newBlock;
+            touched                = true;
+        }
+
+        if (touched) {
+            // Edge metadata now points to the new block but the actual port connections
+            // still reference the old block's ports. Reset to WaitingToBeConnected so
+            // connectPendingEdges() will wire up the new block's ports.
+            edge._state           = Edge::EdgeState::WaitingToBeConnected;
+            edge._sourcePort      = nullptr;
+            edge._destinationPort = nullptr;
         }
     }
 
@@ -62,7 +74,7 @@ std::optional<Message> Graph::propertyCallbackRegistryBlockTypes([[maybe_unused]
 }
 
 std::optional<Message> Graph::propertyCallbackRegistrySchedulerTypes([[maybe_unused]] std::string_view propertyName, Message message) {
-    assert(propertyName == graph::property::kRegistryBlockTypes);
+    assert(propertyName == graph::property::kRegistrySchedulerTypes);
     message.data = property_map{{"types", _pluginLoader->availableSchedulers()}};
     return message;
 }

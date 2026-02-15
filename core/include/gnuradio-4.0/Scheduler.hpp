@@ -1185,6 +1185,7 @@ protected:
         }
 
         auto [oldBlock, newBlockRaw] = targetGraph->replaceBlock(uniqueName, type, properties);
+        targetGraph->connectPendingEdges(); // replaceBlock() resets affected edges to WaitingToBeConnected
         makeZombie(std::move(oldBlock));
 
         if (lifecycle::isActive(this->state())) {

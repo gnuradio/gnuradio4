@@ -528,6 +528,15 @@ public:
         if (sourcePortRef.disconnect() == ConnectionResult::FAILED) {
             throw gr::exception(std::format("Block {} sourcePortRef could not be disconnected {}", sourceBlock, this->unique_name));
         }
+
+        // Also remove matching edge metadata. Without this, disconnectAllEdges() + connectPendingEdges()
+        // (called by reconnectAllEdges() or on scheduler restart) would resurrect the removed edge.
+        const PortDefinition sourcePortDef{std::string(sourcePort)};
+        _edges.erase(std::remove_if(_edges.begin(), _edges.end(),
+                         [&](const Edge& edge) {
+                             return edge.sourceBlock() == *sourceBlockIt && edge.sourcePortDefinition().definition == sourcePortDef.definition;
+                         }),
+            _edges.end());
     }
 
     std::optional<Message> propertyCallbackGraphInspect([[maybe_unused]] std::string_view propertyName, Message message);
