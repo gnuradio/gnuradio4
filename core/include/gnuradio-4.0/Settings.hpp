@@ -857,6 +857,7 @@ public:
 
             // check if reset of settings should be performed
             if (_stagedParameters.contains(gr::tag::RESET_DEFAULTS)) {
+                _stagedParameters.erase(gr::tag::RESET_DEFAULTS); // erase before calling resetDefaults() to prevent infinite recursion
                 resetDefaults();
             }
 

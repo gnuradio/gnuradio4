@@ -116,12 +116,6 @@ inline void addSequences(std::shared_ptr<std::vector<std::shared_ptr<Sequence>>>
             index++;
         }
     } while (!std::atomic_compare_exchange_weak(&sequences, &currentSequences, updatedSequences)); // xTODO: explicit memory order
-
-    cursorSequence = cursor.value();
-
-    for (auto&& sequence : sequencesToAdd) {
-        sequence->setValue(cursorSequence);
-    }
 }
 
 inline bool removeSequence(std::shared_ptr<std::vector<std::shared_ptr<Sequence>>>& sequences, const std::shared_ptr<Sequence>& sequence) {
