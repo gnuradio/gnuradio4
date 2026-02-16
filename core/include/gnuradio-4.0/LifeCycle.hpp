@@ -118,14 +118,14 @@ protected:
     StateStorage _state{lifecycle::State::IDLE};
 
     void setAndNotifyState(State newState) {
-        if constexpr (requires(TDerived d) { d.stateChanged(newState); }) {
-            static_cast<TDerived*>(this)->stateChanged(newState);
-        }
         if constexpr (storageType == StorageType::ATOMIC) {
             _state.store(newState, std::memory_order_release);
             _state.notify_all();
         } else {
             _state = newState;
+        }
+        if constexpr (requires(TDerived d) { d.stateChanged(newState); }) {
+            static_cast<TDerived*>(this)->stateChanged(newState);
         }
     }
 
