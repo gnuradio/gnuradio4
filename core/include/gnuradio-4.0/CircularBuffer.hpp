@@ -566,9 +566,10 @@ private:
 
         ReaderSpan& operator=(const ReaderSpan& other) {
             if (this != &other) {
+                _parent->_instanceCount--; // release old parent before reassigning
                 _parent       = other._parent;
                 _internalSpan = other._internalSpan;
-                _parent->_rangesCounter++;
+                _parent->_instanceCount++;
             }
             return *this;
         }

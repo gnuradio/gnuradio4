@@ -696,7 +696,7 @@ struct Port {
                 return;
             }
 
-            if (tagsPublished > tags.size()) {
+            if (tagsPublished >= tags.size()) {
                 // TODO(error handling): Decide how to surface failures.
                 // Option A: throw an exception, but this function is marked noexcept—either remove noexcept or avoid throwing.
                 // Option B: return an error (or set a port-status flag) that the Scheduler can observe and handle accordingly.

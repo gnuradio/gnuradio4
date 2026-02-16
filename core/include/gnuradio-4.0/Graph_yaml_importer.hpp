@@ -84,7 +84,7 @@ inline void loadGraphFromMap(PluginLoader& loader, gr::Graph& resultGraph, gr::p
                 for (const auto& exportedPort_ : exportedPorts) {
                     auto exportedPort = std::get<std::vector<pmtv::pmt>>(exportedPort_);
                     if (exportedPort.size() != 3) {
-                        throw std::format("Unable to parse exported port ({} instead of 4 elements)", exportedPort.size());
+                        throw gr::exception(std::format("Unable to parse exported port ({} instead of 3 elements)", exportedPort.size()));
                     }
 
                     std::string requiredBlockName = std::get<std::string>(exportedPort[0]);
@@ -121,7 +121,7 @@ inline void loadGraphFromMap(PluginLoader& loader, gr::Graph& resultGraph, gr::p
 
                 auto scheduler = loader.instantiateScheduler(schedulerId, schedulerParams);
                 if (!scheduler) {
-                    throw std::format("Unable to create scheduler of type '{}'", schedulerId);
+                    throw gr::exception(std::format("Unable to create scheduler of type '{}'", schedulerId));
                 }
 
                 auto schedulerBlock = SchedulerModel::asBlockModelPtr(scheduler);
@@ -142,7 +142,7 @@ inline void loadGraphFromMap(PluginLoader& loader, gr::Graph& resultGraph, gr::p
         } else {
             auto currentBlock = loader.instantiate(blockType);
             if (!currentBlock) {
-                throw std::format("Unable to create block of type '{}'", blockType);
+                throw gr::exception(std::format("Unable to create block of type '{}'", blockType));
             }
 
             // This sets the previously read "name" field for the block
@@ -185,14 +185,14 @@ inline void loadGraphFromMap(PluginLoader& loader, gr::Graph& resultGraph, gr::p
     for (const auto& conn : connections) {
         auto connection = std::get<std::vector<pmtv::pmt>>(conn);
         if (connection.size() < 4) {
-            throw std::format("Unable to parse connection ({} instead of >=4 elements)", connection.size());
+            throw gr::exception(std::format("Unable to parse connection ({} instead of >=4 elements)", connection.size()));
         }
 
         auto parseBlockPort = [&](const auto& blockField, const auto& portField) {
             const auto blockName = std::get<std::string>(blockField);
             auto       block     = createdBlocks.find(blockName);
             if (block == createdBlocks.end()) {
-                throw std::format("Unknown block '{}'", blockName);
+                throw gr::exception(std::format("Unknown block '{}'", blockName));
             }
 
             struct result {
@@ -202,7 +202,7 @@ inline void loadGraphFromMap(PluginLoader& loader, gr::Graph& resultGraph, gr::p
 
             if (const auto portFields = std::get_if<std::vector<pmtv::pmt>>(&portField)) {
                 if (portFields->size() != 2) {
-                    throw std::format("Port definition has invalid length ({} instead of 2)", portFields->size());
+                    throw gr::exception(std::format("Port definition has invalid length ({} instead of 2)", portFields->size()));
                 }
                 const auto index    = std::get<std::int64_t>(portFields->at(0));
                 const auto subIndex = std::get<std::int64_t>(portFields->at(1));

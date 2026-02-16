@@ -1923,7 +1923,7 @@ protected:
             }
         }
         _outputTagsChanged = false;
-        return ProcessOneResult{lifecycle::isShuttingDown(this->state()) ? DONE : OK, nSamplesToProcess, std::min(nSamplesToProcess, nOutSamplesBeforeRequestedStop)};
+        return ProcessOneResult{lifecycle::isShuttingDown(this->state()) ? DONE : OK, nOutSamplesBeforeRequestedStop, nOutSamplesBeforeRequestedStop};
     }
 
     [[nodiscard]] bool hasNoDownStreamConnectedChildren() const noexcept {
