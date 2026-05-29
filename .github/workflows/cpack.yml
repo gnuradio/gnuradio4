@@ -11,21 +11,21 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/gnuradio/ci:ubuntu-24.04-4.0
-    env:
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_BASEDIR: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Cache ccache
-        uses: actions/cache@v5
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache-cpack-gcc14-relwithdebinfo-${{ github.sha }}
-          restore-keys: |
-            ccache-cpack-gcc14-relwithdebinfo
+      - name: Prepare sccache usage (if available)
+        id: enable_sccache
+        env:
+          SCCACHE_S3_ENDPOINT: ${{ vars.SCCACHE_S3_ENDPOINT }}
+          SCCACHE_S3_BUCKET: ${{ vars.SCCACHE_S3_BUCKET }}
+          SCCACHE_S3_REGION: ${{ vars.SCCACHE_S3_REGION }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_S3_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ vars.SCCACHE_S3_KEY_ID }}
+        run: .github/ci-tools/setup_cmake_cache_flags.bash "CPack package"
+
 
       - name: Cache fetchContent
         uses: actions/cache@v5
@@ -35,30 +35,20 @@ jobs:
           restore-keys: |
             fetchContent-cpack-gcc14-relwithdebinfo
 
-      - name: Configure ccache
-        run: |
-          ccache --max-size=3G
-          ccache --set-config=compression=true
-          ccache --set-config=compression_level=6
-          ccache --set-config=depend_mode=true
-          ccache --set-config=hash_dir=false
-          ccache --set-config=sloppiness=file_macro,time_macros,include_file_mtime,include_file_ctime
-          ccache -z
-          ccache --show-stats
-
       - name: Configure
         shell: bash
         env:
           CC: gcc-14
           CXX: g++-14
-          CMAKE_EXPORT_COMPILE_COMMANDS: "ON"
         run: |
           cmake -S . -B build \
             -DCMAKE_COLOR_DIAGNOSTICS=ON \
             -DDISABLE_EXTERNAL_DEPS_WARNINGS=ON \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DCPACK_PACKAGING_INSTALL_PREFIX=/opt/gnuradio4 \
-            -DUSE_CCACHE=ON \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            ${{ steps.enable_sccache.outputs.CXX_LAUNCHER }} \
+            ${{ steps.enable_sccache.outputs.C_LAUNCHER }} \
             -DENABLE_EXAMPLES=OFF \
             -DENABLE_TESTING=OFF \
             -DENABLE_COVERAGE=OFF \
@@ -80,36 +70,29 @@ jobs:
             build/*.ddeb
           if-no-files-found: error
 
-      - name: Show final ccache and build directory stats
+      - name: Show final sccache and build directory stats
         if: always()
         continue-on-error: true
-        run: |
-          ccache --show-stats
-          echo "--- Build directory ---"
-          du -sh build
-          echo "--- Debian packages (.deb/.ddeb) ---"
-          find build \( -name "*.deb" -o -name "*.ddeb" \) -exec du -ch {} + | tail -1
+        shell: bash
+        run: ./.github/ci-tools/build-summary.sh "CPack package" "build/"
 
   package-emscripten:
     name: "Emscripten | RelWithDebInfo | CPack"
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/gnuradio/ci:ubuntu-24.04-4.0-emscripten
-    env:
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_BASEDIR: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Cache ccache
-        uses: actions/cache@v5
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache-cpack-emscripten-relwithdebinfo-${{ github.sha }}
-          restore-keys: |
-            ccache-cpack-emscripten-relwithdebinfo
+      - name: Prepare sccache usage (if available)
+        id: enable_sccache
+        env:
+          SCCACHE_S3_ENDPOINT: ${{ vars.SCCACHE_S3_ENDPOINT }}
+          SCCACHE_S3_BUCKET: ${{ vars.SCCACHE_S3_BUCKET }}
+          SCCACHE_S3_REGION: ${{ vars.SCCACHE_S3_REGION }}
+        run: .github/ci-tools/setup_cmake_cache_flags.bash "CPack package emscripten"
 
       - name: Cache fetchContent
         uses: actions/cache@v5
@@ -118,17 +101,6 @@ jobs:
           key: fetchContent-cpack-emscripten-relwithdebinfo-${{ hashFiles('CMakeLists.txt') }}
           restore-keys: |
             fetchContent-cpack-emscripten-relwithdebinfo
-
-      - name: Configure ccache
-        run: |
-          ccache --max-size=3G
-          ccache --set-config=compression=true
-          ccache --set-config=compression_level=6
-          ccache --set-config=depend_mode=true
-          ccache --set-config=hash_dir=false
-          ccache --set-config=sloppiness=file_macro,time_macros,include_file_mtime,include_file_ctime
-          ccache -z
-          ccache --show-stats
 
       - name: Configure
         shell: bash
@@ -146,7 +118,8 @@ jobs:
             -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=all \
             -DCPACK_DEBIAN_PACKAGE_SHLIBDEPS=OFF \
             -DCPACK_DEBIAN_DEBUGINFO_PACKAGE=OFF \
-            -DUSE_CCACHE=ON \
+            ${{ steps.enable_sccache.outputs.CXX_LAUNCHER }} \
+            ${{ steps.enable_sccache.outputs.C_LAUNCHER }} \
             -DENABLE_EXAMPLES=OFF \
             -DENABLE_TESTING=OFF \
             -DENABLE_COVERAGE=OFF \
@@ -166,12 +139,8 @@ jobs:
           path: build/*.deb
           if-no-files-found: error
 
-      - name: Show final ccache and build directory stats
+      - name: Show final sccache and build directory stats
         if: always()
         continue-on-error: true
-        run: |
-          ccache --show-stats
-          echo "--- Build directory ---"
-          du -sh build
-          echo "--- Debian packages (.deb/.ddeb) ---"
-          find build \( -name "*.deb" -o -name "*.ddeb" \) -exec du -ch {} + | tail -1
+        shell: bash
+        run: ./.github/ci-tools/build-summary.sh "CPack package emscripten" "build/"

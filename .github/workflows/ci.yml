@@ -1,4 +1,4 @@
-name: main CI
+name: common/pull-request CI
 
 on:
   pull_request:
@@ -67,9 +67,6 @@ jobs:
       cancel-in-progress: true
     container:
       image: "${{ matrix.image }}"
-    env:
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_BASEDIR: ${{ github.workspace }}
     strategy:
       fail-fast: false
       matrix:
@@ -108,24 +105,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Cache ccache
-        uses: actions/cache@v5
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache-${{ runner.os }}-${{ matrix.cache_key }}-${{ github.sha }}
-          restore-keys: |
-            ccache-${{ runner.os }}-${{ matrix.cache_key }}
-
-      - name: Configure ccache
-        run: |
-          ccache --max-size=3G
-          ccache --set-config=compression=true
-          ccache --set-config=compression_level=6
-          ccache --set-config=depend_mode=true
-          ccache --set-config=hash_dir=false
-          ccache --set-config=sloppiness=file_macro,time_macros,include_file_mtime,include_file_ctime
-          ccache -z
-          ccache --show-stats
+      - name: Prepare sccache usage (if available)
+        id: enable_sccache
+        env:
+          SCCACHE_S3_ENDPOINT: ${{ vars.SCCACHE_S3_ENDPOINT }}
+          SCCACHE_S3_BUCKET: ${{ vars.SCCACHE_S3_BUCKET }}
+          SCCACHE_S3_REGION: ${{ vars.SCCACHE_S3_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ vars.SCCACHE_S3_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_S3_KEY }}
+        run: .github/ci-tools/setup_cmake_cache_flags.bash "${{ matrix.name }}"
 
       - name: Cache fetchContent
         uses: actions/cache@v5
@@ -143,9 +131,40 @@ jobs:
         env:
           CC: "${{ matrix.cc }}"
           CXX: "${{ matrix.cxx }}"
-          CMAKE_EXPORT_COMPILE_COMMANDS: "ON"
-        run: |
-          cmake -S . -B ../build -DCMAKE_COLOR_DIAGNOSTICS=ON -DDISABLE_EXTERNAL_DEPS_WARNINGS=ON -DCMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }} -DUSE_CCACHE=ON -DENABLE_COVERAGE=OFF ${{ matrix.cmake_flags }}
+        run: >
+          cmake \
+            -S . \
+            -B ../build \
+            -DCMAKE_COLOR_DIAGNOSTICS=ON \
+            -DDISABLE_EXTERNAL_DEPS_WARNINGS=ON \
+            -DCMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }} \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            ${{ steps.enable_sccache.outputs.CXX_LAUNCHER }} \
+            ${{ steps.enable_sccache.outputs.C_LAUNCHER }} \
+            -DENABLE_COVERAGE=OFF \
+            ${{ matrix.cmake_flags }}
+
+      - name: Configure AdaptiveCpp
+        if: matrix.cxx == 'acpp'
+        shell: bash
+        env:
+          CC: "${{ matrix.cc }}"
+          CXX: "${{ matrix.cxx }}"
+          ACPP_TARGETS: omp
+        run: >
+          which acpp &&
+          acpp --version &&
+          cmake \
+            -S . \
+            -B ../build \
+            -DCMAKE_COLOR_DIAGNOSTICS=ON \
+            -DDISABLE_EXTERNAL_DEPS_WARNINGS=ON \
+            -DCMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }} \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            ${{ steps.enable_sccache.outputs.CXX_LAUNCHER }} \
+            ${{ steps.enable_sccache.outputs.C_LAUNCHER }} \
+            -DENABLE_COVERAGE=OFF \
+            ${{ matrix.cmake_flags }}
 
       - name: Configure CMake Emscripten
         if: matrix.cmake_wrapper == 'emcmake'
@@ -154,10 +173,14 @@ jobs:
           export SYSTEM_NODE=`which node` # use system node instead of old version distributed with emsdk
           $EMSDK_HOME/emsdk activate $EMSDK_VERSION
           source $EMSDK_HOME/emsdk_env.sh
-          ${{ matrix.cmake_wrapper }} cmake -S . -B ../build \
+          ${{ matrix.cmake_wrapper }} \
+          cmake \
+            -S . \
+            -B ../build \
             -DCMAKE_COLOR_DIAGNOSTICS=ON \
             -DDISABLE_EXTERNAL_DEPS_WARNINGS=ON \
-            -DUSE_CCACHE=ON \
+            ${{ steps.enable_sccache.outputs.CXX_LAUNCHER }} \
+            ${{ steps.enable_sccache.outputs.C_LAUNCHER }} \
             -DCMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }} \
             ${{ matrix.cmake_flags }}
 
@@ -187,14 +210,8 @@ jobs:
         shell: bash
         run: node ./core/src/main.js
 
-      - name: Show final ccache and build directory stats
+      - name: Show final sccache and build directory stats
         if: always()
         continue-on-error: true
-        run: |
-          ccache --show-stats
-          echo "--- Build directory ---"
-          du -sh ../build
-          echo "--- Object files (.o) ---"
-          find ../build -name "*.o" -exec du -ch {} + | tail -1
-          echo "--- Archives (.a) ---"
-          find ../build -name "*.a" -exec du -ch {} + | tail -1
+        shell: bash
+        run: ./.github/ci-tools/build-summary.sh "${{ matrix.name }}" "../build"
