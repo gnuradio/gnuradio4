@@ -33,8 +33,8 @@ energy particle physics, astrophysics, radio astronomy and more!
 GNU Radio 4.0 uses modern C++ (C++23), and is tested for
 
 - CMake (>= 3.25),
-- GCC (>=13.3, better: >=14.2)
-- Clang (>=18, recommended), and
+- GCC (>=14, recommended: >=15)
+- Clang (>=20, recommended), and
 - Emscripten (5.0.2).
 
 **To build**:
