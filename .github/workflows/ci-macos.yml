@@ -52,7 +52,7 @@ jobs:
           SCCACHE_S3_REGION: ${{ vars.SCCACHE_S3_REGION }}
           AWS_ACCESS_KEY_ID: ${{ vars.SCCACHE_S3_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_S3_KEY }}
-        run: .github/ci-tools/setup_cmake_cache_flags.bash "${{ matrix.distro }}"
+        run: .github/ci-tools/setup_cmake_cache_flags.bash "MacOS ${{ matrix.compiler.label }}"
 
       - name: Restore FetchContent
         id: restore-fetchcontent
@@ -92,7 +92,7 @@ jobs:
         if: always()
         continue-on-error: true
         shell: zsh
-        run: ./.github/ci-tools/build-summary.sh "macos" "build/"
+        run: ./.github/ci-tools/build-summary.sh "MacOS ${{ matrix.compiler.label }}" "build/"
 
       - name: Save FetchContent
         if: always() && steps.restore-fetchcontent.outputs.cache-hit != 'true'
