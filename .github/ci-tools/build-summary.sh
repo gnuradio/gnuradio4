@@ -28,7 +28,7 @@ fi
 
 printf '::group::build directory stats\n'
 kiB_to_MiB () {
-  echo "scale=2; $1 / 1024" | bc
+  python3 -c "print(f'{${1} / 1024:3.2f}')"
 }
 (
   shopt -s dotglob globstar
