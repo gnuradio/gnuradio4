@@ -8,7 +8,7 @@ if type -p sccache > /dev/null ; then
   misses="$(printf '%s' "${stats}" | sed -n 's/Cache misses[[:space:]]*\([0-9]*\)$/\1/p')"
   hits="$(printf '%s' "${stats}" | sed -n 's/Cache hits[[:space:]]*\([0-9]*\)$/\1/p')"
   requests="$(printf '%s' "${stats}" | sed -n 's/Compile requests[[:space:]]*\([0-9]*\)$/\1/p')"
-  gh_message "Caching" "${misses} misses, ${hits} hits ${requests} compile requests"
+  echo "sccache: ${misses} misses, ${hits} hits ${requests} compile requests"
   printf '::group::sccache stats\n'
   printf '%s' "${stats}"
   for err_line in "${errors}"; do
@@ -24,7 +24,7 @@ if type -p sccache > /dev/null ; then
   fi
   printf '::endgroup::\n'
 else
-  gh_message 'skipping sccache stats' 'sccache not found'
+  echo 'skipping sccache stats: sccache not found'
 fi
 
 printf '::group::build directory stats\n'
@@ -37,9 +37,9 @@ kiB_to_MiB () {
   kB_o_files="$( (du -ck "${builddir}"/**/*.o 2> /dev/null || echo 0) | tail -1 | sed 's/\([^[:space:]]*\).*/\1/')"
   kB_so_files="$( (du -ck "${builddir}"/**/*.so 2> /dev/null || echo 0) | tail -1 | sed 's/\([^[:space:]]*\).*/\1/')"
   kB_a_files="$( (du -ck "${builddir}"/**/*.a 2> /dev/null || echo 0) | tail -1 | sed 's/\([^[:space:]]*\).*/\1/')"
-  gh_message "Build directory size" "build/**: $( kiB_to_MiB "${kB_build}" ) MiB"
-  gh_message "Build directory shared library (.so) files cumulative size" "build/**/*.so: $( kiB_to_MiB "${kB_so_files}" ) MiB"
-  gh_message "Build directory object (.o) files cumulative size" "build/**/*.o: $( kiB_to_MiB "${kB_o_files}" ) MiB"
-  gh_message "Build directory static library (.a) files cumulative size" "build/**/*.a: $( kiB_to_MiB "${kB_a_files}" ) MiB"
+  echo "Build directory size: $( kiB_to_MiB "${kB_build}" ) MiB"
+  echo "Build directory shared library (.so) files cumulative size: $( kiB_to_MiB "${kB_so_files}" ) MiB"
+  echo "Build directory object (.o) files cumulative size: $( kiB_to_MiB "${kB_o_files}" ) MiB"
+  echo "Build directory static library (.a) files cumulative size: $( kiB_to_MiB "${kB_a_files}" ) MiB"
 )
 printf '::endgroup::\n'
