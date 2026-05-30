@@ -68,7 +68,8 @@ EOF
 fi
 
 add_output SCCACHE_CONF "${SCCACHE_CONF}"
-add_env SCCACHE_ERROR_LOG "/tmp/local_sccache.log"
+export SCCACHE_ERROR_LOG="/tmp/local_sccache.log"
+add_env SCCACHE_ERROR_LOG "${SCCACHE_ERROR_LOG}"
 # These could be set here, but they do spam the compile output slightly.
 # add_env SCCACHE_LOG debug
 # Instead, we just set the environment locally with debug logging on
