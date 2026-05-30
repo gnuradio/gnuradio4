@@ -21,13 +21,11 @@ if [[ -z "${SCCACHE_S3_REGION}" ]] ; then
   export SCCACHE_S3_REGION="auto"
   add_env SCCACHE_S3_REGION "${SCCACHE_S3_REGION}"
 fi
-aws_ro="false"
 if [[ -z "${AWS_ACCESS_KEY_ID}" ]] ; then
   # set up default bucket here
   gh_message "sccache" "AWS key ID not set. Using default read-only key ID & key"
   export AWS_ACCESS_KEY_ID="0021090e73dcc12000000000c"
   add_env AWS_ACCESS_KEY_ID "${AWS_ACCESS_KEY_ID}"
-  aws_ro="true"
   # Can't have a key without a key id.
   export AWS_SECRET_ACCESS_KEY="K002P+ZeW31+o4HIhDz8CXZg6OpFI4k"
 fi
@@ -49,7 +47,7 @@ endpoint = "${SCCACHE_S3_ENDPOINT}"
 bucket = "${SCCACHE_S3_BUCKET}"
 use_ssl = true
 server_side_encryption = false
-no_credentials = ${aws_ro}
+no_credentials = false
 region = "${SCCACHE_S3_REGION}"
 EOF
 fi
