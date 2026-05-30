@@ -3,13 +3,14 @@
 source "$(dirname "$(realpath "$0")")/common.bash"
 builddir="$2"
 if type -p sccache > /dev/null ; then
-  printf '::group::sccache stats\n'
   stats="$(sccache -s)"
   errors="$(printf '%s' "${stats}" | sed -n 's/\(.*\) errors[[:space:]]*\([0-9]*\)$/\1:\2/p')"
   misses="$(printf '%s' "${stats}" | sed -n 's/Cache misses[[:space:]]*\([0-9]*\)$/\1/p')"
   hits="$(printf '%s' "${stats}" | sed -n 's/Cache hits[[:space:]]*\([0-9]*\)$/\1/p')"
   requests="$(printf '%s' "${stats}" | sed -n 's/Compile requests[[:space:]]*\([0-9]*\)$/\1/p')"
   gh_message "Caching" "${misses}:${hits}:${requests} cache misses:cache hits:compile requests"
+  printf '::group::sccache stats\n'
+  printf '%s' "${stats}"
   for err_line in "${errors}"; do
     count="$(echo "${err_line}" | head -n1 | cut -f2 -d:)"
     if [[ count -gt 0 ]] ; then
