@@ -36,6 +36,11 @@ printf '::group::S3 setup\n'
     export AWS_SECRET_ACCESS_KEY="K002P+ZeW31+o4HIhDz8CXZg6OpFI4k"
   fi
   add_env AWS_SECRET_ACCESS_KEY "${AWS_SECRET_ACCESS_KEY}"
+  # lets mask a few things in output. I bet people are scraping github action
+  # output for leaked credentials, and while there's nothing secret on that, I
+  # don't want to pay for some stupid scraper downloading the whole cache.
+  add_mask "${AWS_SECRET_ACCESS_KEY}"
+  add_mask "${AWS_ACCESS_KEY_ID}"
 }
 printf '::endgroup::'
 if [[ "${use_default}" = "true" ]] ; then

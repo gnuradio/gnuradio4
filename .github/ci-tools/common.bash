@@ -18,3 +18,6 @@ add_output() {
 add_env() {
   printf '%s=%s\n' "$1" "$2" >> "${GITHUB_ENV}"
 }
+add_mask() {
+  printf '::add-mask::%s\n' "$1"
+}
