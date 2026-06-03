@@ -42,8 +42,14 @@ By default this will use the gcc-14 compiler included in the image, by setting `
 To be able to natively compile some prerequisites have to be installed:
 
 - gcc >= 14 and/or clang >= 20
-- cmake >= 3.25.0
+- cmake >= 3.27
 - ninja (or GNU make)
+- pkg-config
+- Boost.UT development package or installed headers
+- cpp-httplib development package
+- cpr development package (or `-DGR_ENABLE_HTTP=OFF`)
+- libsoundio development package
+- vir-simd headers
 - optional for python block support: python3
 - optional for soapy (limesdr,rtlsdr) blocks: soapysdr
 - optional for compiling to webassembly: emscripten >= 5.0.0
@@ -54,7 +60,7 @@ Once these are installed, you should be able to just compile and run GNURadio4:
 
 ```bash
 me@host$ cd gnuradio4
-me@host$ cmake -S . -B build
+me@host$ cmake -S . -B build -DGR_USE_FETCHCONTENT_DEPS=ON
 me@host$ cmake --build build
 me@host$ ctest --test-dir build
 ```
@@ -91,7 +97,9 @@ $ pacman -S git moreutils \
                     mingw-w64-ucrt-x86_64-dlfcn \
                     mingw-w64-ucrt-x86_64-nodejs \
                     mingw-w64-ucrt-x86_64-soapysdr \
-                    mingw-w64-ucrt-x86_64-soapyrtlsdr
+                    mingw-w64-ucrt-x86_64-soapyrtlsdr \
+                    mingw-w64-ucrt-x86_64-libsoundio \
+                    mingw-w64-ucrt-x86_64-cpp-httplib
 ```
 
 If one wants to use `CLANG64` to build instead of `UCRT64`, you can use the comamnd that follows.
@@ -108,7 +116,9 @@ $ pacman -S git moreutils \
                     mingw-w64-clang-x86_64-dlfcn \
                     mingw-w64-clang-x86_64-nodejs \
                     mingw-w64-clang-x86_64-soapysdr \
-                    mingw-w64-clang-x86_64-soapyrtlsdr
+                    mingw-w64-clang-x86_64-soapyrtlsdr \
+                    mingw-w64-clang-x86_64-libsoundio \
+                    mingw-w64-clang-x86_64-cpp-httplib
 ```
 
 And of course, both can be run to install both environments.
@@ -126,6 +136,7 @@ $ cmake -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_VERBOSE_MAKEFILE=ON \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DWARNINGS_AS_ERRORS=OFF \
+            -DGR_USE_FETCHCONTENT_DEPS=ON \
             -DCMAKE_INSTALL_PREFIX=/home/$USER/gr4 \
             -S . -B build
 ```
