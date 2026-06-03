@@ -59,7 +59,9 @@ jobs:
         run: cmake --build build --target package
 
       - name: Verify package installation
-        run: sudo apt install ./build/*.deb ./build/*.ddeb -y
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: apt-get install -y ./build/*.deb ./build/*.ddeb
 
       - name: Upload packages
         uses: actions/upload-artifact@v7
