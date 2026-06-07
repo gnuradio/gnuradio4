@@ -8,21 +8,15 @@ jobs:
   build:
     name: "Create single-header release"
     runs-on: "ubuntu-latest"
+    container: 
+      image: ghcr.io/gnuradio/ci:ubuntu-26.04-4.0
 
     steps:
     - uses: actions/checkout@v6
       with:
         fetch-depth: 100
 
-    - name: Cache
-      uses: actions/cache@v5
-      env:
-        cache-name: cache-fetchContent-cache
-      with:
-        path: ${{runner.workspace}}/build/_deps
-        key: ${{ runner.os }}-gcc-Release-${{ hashFiles('CMakeLists.txt') }}-${{ hashFiles('cmake/Dependencies.cmake') }}
-
-    - name: Configure CMake to fetch UT dependency
+    - name: Configure CMake
       shell: bash
       run: cmake -S . -B ./build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-14 -DCMAKE_C_COMPILER=gcc-14 -DENABLE_BLOCK_REGISTRY=Off -DENABLE_BLOCK_PLUGINS=Off
 
