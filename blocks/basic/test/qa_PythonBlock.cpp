@@ -1,7 +1,8 @@
+#include <gnuradio-4.0/basic/PythonBlock.hpp>
+
 #include <boost/ut.hpp>
 
 #include <gnuradio-4.0/Graph.hpp>
-#include <gnuradio-4.0/basic/PythonBlock.hpp>
 
 #include <gnuradio-4.0/Scheduler.hpp>
 #include <gnuradio-4.0/meta/UnitTestHelper.hpp>
