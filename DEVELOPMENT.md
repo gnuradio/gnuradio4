@@ -56,7 +56,7 @@ To be able to natively compile some prerequisites have to be installed:
 
 To apply the project's formatting rules, you'll also need the correct formatters, `clang-format-18` and `cmake-format`. With these installed you can use the scripts in the repository to reformat your changes. For smaller changes, the CI will provide you with a patch which will fix the formatting (click on the "Details" link on the failed Restyled.io check), but for bigger changes it's useful to have local formatting.
 
-Once these are installed, you should be able to just compile and run GNURadio4:
+Once these are installed, you should be able to just compile and run GNURadio4. Note that the `-DGR_USE_FETCHCONTENT_DEPS=ON` flag tells CMake to automatically download and build missing dependencies via FetchContent. If all required packages are included in your configured prefix, this flag is not needed. It is primarily useful on systems where certain libraries (like Boost.UT on Ubuntu 24) are not officially packaged.
 
 ```bash
 me@host$ cd gnuradio4
