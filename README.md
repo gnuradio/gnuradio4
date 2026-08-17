@@ -1,3 +1,6 @@
+[![Main CI](https://github.com/gnuradio/gnuradio4/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/gnuradio/gnuradio4/actions/workflows/ci.yml)
+[![Studio Web image](https://img.shields.io/badge/ghcr.io-gnuradio4--studio-2496ED?logo=github)](https://github.com/gnuradio/gnuradio4/pkgs/container/gnuradio4-studio)
+
 <p align="center">
   <img
     src="https://raw.githubusercontent.com/gnuradio/gnuradio4-core/main/docs/logo.png"
@@ -5,23 +8,22 @@
     width="30%">
 </p>
 
-# GNU Radio 4.0
+# GNU Radio 4
 
-[![Main CI](https://github.com/gnuradio/gnuradio4/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/gnuradio/gnuradio4/actions/workflows/ci.yml)
-[![Studio Web image](https://img.shields.io/badge/ghcr.io-gnuradio4--studio-2496ED?logo=github)](https://github.com/gnuradio/gnuradio4/pkgs/container/gnuradio4-studio)
-
-> [!IMPORTANT]
-> GNU Radio 4.0 (GR4) is a maturing beta as it approaches its first stable
-> release. It is suitable for evaluation, experimentation, and early
-> development. GNU Radio 3.x remains the stable release series for users who
-> require the existing production-supported platform.
-
-GNU Radio is a free and open-source signal-processing runtime and software
+This is the official repository and entry point for GNU Radio 4 (GR4).
+[GNU Radio](https://www.gnuradio.org) is a free and open-source signal-processing runtime and software
 development toolkit. GR4 provides a modern C++23 block API, runtime-loadable
 blocks and schedulers, an installed development SDK, and browser and desktop
 Studio applications. This repository is the top-level GR4 workspace: it builds
 the independently maintained core, library, blocks, incubator, control-plane,
 and Studio repositories in dependency order into one development prefix.
+
+## Requirements
+
+The core stack requires CMake 3.27+, Ninja, Git, and a C++23 compiler (GCC 14+
+or a current Clang). The complete Studio workspace also requires Node.js 22 and
+npm. See [Build guide](docs/building.md) for platform setup, profile choices,
+and resource limits.
 
 ## Quick start
 
@@ -65,13 +67,6 @@ fetch, update, or switch its branch.
 Docker is the documented container host. Podman is supported as a rootless
 alternative; see [CI and containers](docs/ci.md#docker-and-podman).
 
-## Requirements
-
-The core stack requires CMake 3.27+, Ninja, Git, and a C++23 compiler (GCC 14+
-or a current Clang). The complete Studio workspace also requires Node.js 22 and
-npm. See [Build guide](docs/building.md) for platform setup, profile choices,
-and resource limits.
-
 ## Workspace components
 
 | Component | Purpose |
@@ -93,7 +88,7 @@ Foundation
 Modules       [blocks] [incubator] [OOTs]
                   .        .         .
                   `------ runtime plugins ------.
-                                                  v
+                                                 v
 Applications                          [control-plane] --> [studio]
 ```
 
