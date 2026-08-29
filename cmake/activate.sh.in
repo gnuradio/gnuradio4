@@ -12,6 +12,8 @@ export LD_LIBRARY_PATH="${_gr4_libdir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 export DYLD_LIBRARY_PATH="${_gr4_libdir}${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
 export GNURADIO4_PLUGIN_DIRECTORIES="${_gr4_libdir}/gnuradio-4/plugins:${_gr4_libdir}${GNURADIO4_PLUGIN_DIRECTORIES:+:${GNURADIO4_PLUGIN_DIRECTORIES}}"
 
+[[ "${SHELLNAME}" = "zsh" ]] && setopt NULL_GLOB
+
 for _gr4_python_dir in "${_gr4_libdir}"/python*/site-packages "${_gr4_libdir}"/python*/dist-packages; do
   if [ -d "${_gr4_python_dir}" ]; then
     export PYTHONPATH="${_gr4_python_dir}${PYTHONPATH:+:${PYTHONPATH}}"
