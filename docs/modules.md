@@ -10,7 +10,7 @@ in named module groups.
 | Group | Modules |
 | --- | --- |
 | `base` | core, library, blocks |
-| `full` | incubator, control-plane, Studio blocks and application |
+| `full` | control-plane, Studio blocks and application |
 | `experimental` | incubator |
 | `applications` | control-plane, Studio blocks and application |
 
@@ -23,8 +23,8 @@ cmake --preset dev -DGR4_MODULE_GROUPS="base;experimental"
 # Add one registered module and its required dependencies
 cmake --preset dev -DGR4_MODULES=gr4-incubator
 
-# Full profile without incubator
-cmake --preset full -DGR4_EXCLUDE_MODULES=gr4-incubator
+# Full profile plus incubator
+cmake --preset full -DGR4_MODULES=gr4-incubator
 ```
 
 Required dependencies are selected automatically. Excluding one is an error.

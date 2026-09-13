@@ -104,7 +104,7 @@
       "cacheVariables": {
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/full",
         "GR4_MODULE_GROUPS": "base;full",
-        "GR4_INCUBATOR_CMAKE_ARGS": "-DENABLE_PLUGINS=ON;-DWARNINGS_AS_ERRORS=OFF"
+        "GR4_BLOCKS_CMAKE_ARGS": "-DGR4_ENABLE_ZEROMQ=ON;-DGR4_ENABLE_SDR=ON;-DGR4_ENABLE_AUDIO=ON"
       }
     },
     {
@@ -115,7 +115,7 @@
       "cacheVariables": {
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/full-ci",
         "GR4_MODULE_GROUPS": "base;full",
-        "GR4_INCUBATOR_CMAKE_ARGS": "-DENABLE_PLUGINS=ON;-DWARNINGS_AS_ERRORS=OFF"
+        "GR4_BLOCKS_CMAKE_ARGS": "-DGR4_ENABLE_ZEROMQ=ON;-DGR4_ENABLE_SDR=ON;-DGR4_ENABLE_AUDIO=ON"
       }
     }
   ],
