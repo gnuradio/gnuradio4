@@ -18,7 +18,8 @@
       "cacheVariables": {
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/full-mac",
         "CMAKE_C_COMPILER": "/opt/homebrew/opt/llvm/bin/clang",
-        "CMAKE_CXX_COMPILER": "/opt/homebrew/opt/llvm/bin/clang++"
+        "CMAKE_CXX_COMPILER": "/opt/homebrew/opt/llvm/bin/clang++",
+        "GR4_BLOCKS_CMAKE_ARGS": "-DGR4_ENABLE_ZEROMQ=ON;-DGR4_ENABLE_SDR=ON;-DGR4_ENABLE_AUDIO=ON"
       }
     }
   ],
