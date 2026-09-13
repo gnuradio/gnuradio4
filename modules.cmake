@@ -41,7 +41,7 @@ gr4_register_module(
   OPTIONS_KEY INCUBATOR
   REPOSITORY https://github.com/gnuradio/gr4-incubator.git
   REF main
-  GROUPS full experimental
+  GROUPS experimental
   DEPENDS gnuradio4-blocks)
 
 gr4_register_module(

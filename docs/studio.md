@@ -1,8 +1,9 @@
 # GNU Radio 4 Studio
 
-The `full` profile adds incubator, control-plane, Studio C++ blocks, and the
-Node/Vite Studio application. It builds a desktop Electron bundle and installs
-it with a pinned Electron runtime.
+The `full` profile enables the ZeroMQ, SDR, and Audio block families and adds
+control-plane, Studio C++ blocks, and the Node/Vite Studio application. It
+builds a desktop Electron bundle and installs it with a pinned Electron
+runtime.
 
 ## Desktop Studio
 

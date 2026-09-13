@@ -37,8 +37,8 @@ source build/dev/activate.sh
 | `ubsan` | Debug, tests, UndefinedBehaviorSanitizer | Undefined-behavior diagnostics | `install/ubsan/` |
 | `offline` | RelWithAssert, tests, system dependencies | No dependency downloads | `install/offline/` |
 | `ci` | RelWithAssert, tests, warnings as errors | Base-stack integration CI | `install/ci/` |
-| `full` | RelWithAssert, tests, incubator, control-plane, Studio | Complete application development | `install/full/` |
-| `full-ci` | RelWithAssert, tests, incubator, control-plane, Studio | Complete integration CI | `install/full-ci/` |
+| `full` | RelWithAssert, tests, ZeroMQ/SDR/Audio blocks, control-plane, Studio | Complete application development | `install/full/` |
+| `full-ci` | RelWithAssert, tests, ZeroMQ/SDR/Audio blocks, control-plane, Studio | Complete integration CI | `install/full-ci/` |
 
 Discover the profiles available in the current checkout:
 
@@ -82,7 +82,9 @@ incremental. To clone selected sources without compiling:
 cmake --build --preset dev --target sources
 ```
 
-Use `full` instead of `dev` to include incubator, control-plane, and Studio.
+Use `full` instead of `dev` to enable the ZeroMQ, SDR, and Audio block families
+and include control-plane and Studio. Select the `experimental` module group
+separately to include incubator.
 Remove one child's build state without deleting its source or shared prefix:
 
 ```sh
@@ -103,9 +105,15 @@ For full-workspace targets:
 
 ```sh
 cmake --build --preset full --target gnuradio4-control-plane
-cmake --build --preset full --target gr4-incubator
 cmake --build --preset full --target gnuradio4-studio-blocks
 cmake --build --preset full --target gnuradio4-studio
+```
+
+Configure incubator explicitly before building its target:
+
+```sh
+cmake --preset dev -DGR4_MODULES=gr4-incubator
+cmake --build --preset dev --target gr4-incubator
 ```
 
 ## macOS with Homebrew

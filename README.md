@@ -35,8 +35,8 @@ cmake --build --preset dev
 source build/dev/activate.sh
 ```
 
-Build the complete workspace, including incubator, control-plane, and the
-desktop Studio application:
+Build the complete workspace, enabling the ZeroMQ, SDR, and Audio block
+families and including control-plane and the desktop Studio application:
 
 ```sh
 cmake --preset full
