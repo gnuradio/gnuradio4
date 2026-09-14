@@ -37,7 +37,7 @@ cmake --build --preset dev
 source build/dev/activate.sh
 ```
 
-Build the complete workspace, including incubator, control-plane, and the
+Build the complete workspace, including control-plane and the
 desktop Studio application:
 
 ```sh
