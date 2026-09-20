@@ -168,6 +168,12 @@ function(gr4_add_project name)
       "-DUB_SANITIZER:BOOL=${GR4_UB_SANITIZER}"
       "-DGR_PACKAGING:BOOL=${GR_ENABLE_PACKAGING}")
 
+  if(APPLE)
+    # so the component packages a module builds carry the same signature as the
+    # bundle composed around them
+    list(APPEND cmake_args "-DGR4_MACOS_SIGN_IDENTITY:STRING=${GR4_MACOS_SIGN_IDENTITY}")
+  endif()
+
   foreach(variable CMAKE_C_COMPILER CMAKE_CXX_COMPILER CMAKE_TOOLCHAIN_FILE)
     if(DEFINED ${variable} AND NOT "${${variable}}" STREQUAL "")
       list(APPEND cmake_args "-D${variable}:FILEPATH=${${variable}}")

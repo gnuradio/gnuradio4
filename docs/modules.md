@@ -115,6 +115,7 @@ repository's package scripts rather than `CMAKE_ARGS`.
 | `BUILD_SHARED_LIBS` | `ON` | Build shared libraries |
 | `CMAKE_INSTALL_PREFIX` | `install/` | Shared installation prefix |
 | `CMAKE_INSTALL_LIBDIR` | `lib` | Library directory under the prefix |
+| `GR_ENABLE_PACKAGING` | `OFF` | Build the unified installer; see the [packaging guide](packaging.md) for the `GR4_BUNDLE_*` and `GR4_MACOS_*` options it enables |
 
 `GR4_STUDIO_REPOSITORY` and `GR4_STUDIO_REF` select the checkout shared by the
 Studio-blocks and Node application modules.
