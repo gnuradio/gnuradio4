@@ -106,6 +106,7 @@ repository's package scripts rather than `CMAKE_ARGS`.
 | `GR4_INCUBATOR_REPOSITORY`, `GR4_INCUBATOR_REF` | GNU Radio, `main` | Incubator clone source and revision |
 | `GR4_CONTROL_PLANE_REPOSITORY`, `GR4_CONTROL_PLANE_REF` | GNU Radio, `main` | Control-plane clone source and revision |
 | `GR4_STUDIO_REPOSITORY`, `GR4_STUDIO_REF` | GNU Radio, `main` | Studio clone source and revision |
+| `GR4_CORE_SOURCE_DIR`, `GR4_LIBRARY_SOURCE_DIR`, ... | empty | Existing checkout to build instead of the one below `GR4_SOURCE_ROOT` |
 | `GR4_BUILD_TESTING` | `ON` | Allow explicitly registered child-project tests |
 | `GR4_FETCH_DEPS` | `ON` | Allow selected dependency downloads |
 | `GR4_WARNINGS_AS_ERRORS` | `ON` | Treat child warnings as errors |
@@ -117,6 +118,13 @@ repository's package scripts rather than `CMAKE_ARGS`.
 
 `GR4_STUDIO_REPOSITORY` and `GR4_STUDIO_REF` select the checkout shared by the
 Studio-blocks and Node application modules.
+
+`GR4_<SOURCE_KEY>_SOURCE_DIR` builds a module from an existing checkout anywhere
+on disk, for example `-DGR4_CORE_SOURCE_DIR=C:/dev/gnuradio/gr-core` or the same
+key under a preset's `cacheVariables`. The path is the repository root, also for
+modules with a `SOURCE_SUBDIR`. It is never cloned into, so configure fails if
+the module is not already there. Like the repository variables it belongs to the
+checkout, so `GR4_STUDIO_SOURCE_DIR` moves both Studio modules.
 
 `GR4_EXTRA_CMAKE_ARGS` applies a child-project option to all CMake modules.
 For example:

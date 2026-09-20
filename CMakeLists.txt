@@ -12,8 +12,10 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
       CACHE PATH "Shared install prefix for all GNU Radio 4 projects" FORCE)
 endif()
 
+
+option(GR_ENABLE_PACKAGING "Create packaging target for GR4" OFF)
 set(GR4_SOURCE_ROOT
-    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/src"   
     CACHE PATH "Directory containing the GNU Radio 4 source repositories")
 set(GR4_EXTRA_PROJECTS
     ""
@@ -79,6 +81,8 @@ if(install_libdir_is_absolute)
 else()
   set(GR4_INSTALL_LIBDIR_FULL "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 endif()
+
+include(cmake/PackageGr4.cmake)
 
 set_property(GLOBAL PROPERTY GR4_PROJECT_TARGETS "")
 set_property(GLOBAL PROPERTY GR4_SOURCE_TARGETS "")
@@ -161,7 +165,8 @@ function(gr4_add_project name)
       "-DGR_USE_FETCHCONTENT_DEPS:BOOL=${GR4_FETCH_DEPS}"
       "-DWARNINGS_AS_ERRORS:BOOL=${GR4_WARNINGS_AS_ERRORS}"
       "-DADDRESS_SANITIZER:BOOL=${GR4_ADDRESS_SANITIZER}"
-      "-DUB_SANITIZER:BOOL=${GR4_UB_SANITIZER}")
+      "-DUB_SANITIZER:BOOL=${GR4_UB_SANITIZER}"
+      "-DGR_PACKAGING:BOOL=${GR_ENABLE_PACKAGING}")
 
   foreach(variable CMAKE_C_COMPILER CMAKE_CXX_COMPILER CMAKE_TOOLCHAIN_FILE)
     if(DEFINED ${variable} AND NOT "${${variable}}" STREQUAL "")
@@ -212,6 +217,8 @@ function(gr4_add_project name)
     "${name}-clean"
     COMMAND "${CMAKE_COMMAND}" -E rm -rf "${project_binary_dir}" "${project_stamp_dir}"
     COMMENT "Removing ${name}'s build state")
+
+  gr4_package_project("${name}" "${project_binary_dir}")
 
   set_property(GLOBAL APPEND PROPERTY GR4_PROJECT_TARGETS "${name}")
   set_property(GLOBAL APPEND PROPERTY GR4_SOURCE_TARGETS "${name}-download")
@@ -346,6 +353,7 @@ foreach(source_dir IN LISTS GR4_EXTRA_PROJECTS)
 endforeach()
 
 gr4_realize_modules()
+gr4_add_installer_target()
 
 get_property(project_targets GLOBAL PROPERTY GR4_PROJECT_TARGETS)
 get_property(source_targets GLOBAL PROPERTY GR4_SOURCE_TARGETS)
