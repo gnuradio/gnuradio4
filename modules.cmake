@@ -8,7 +8,7 @@ gr4_register_module(
   SOURCE_KEY CORE
   OPTIONS_KEY CORE
   REPOSITORY https://github.com/gnuradio/gnuradio4-core.git
-  REF main
+  REF 6c917fa1ea97eba9984aeb4e96dab1d4f37aa786
   GROUPS base)
 
 gr4_register_module(
@@ -18,7 +18,7 @@ gr4_register_module(
   SOURCE_KEY LIBRARY
   OPTIONS_KEY LIBRARY
   REPOSITORY https://github.com/gnuradio/gnuradio4-library.git
-  REF main
+  REF 15d1dbe1f86e9b3834bfe4210039ac55620f1a60
   GROUPS base
   DEPENDS gnuradio4-core)
 
@@ -29,7 +29,7 @@ gr4_register_module(
   SOURCE_KEY BLOCKS
   OPTIONS_KEY BLOCKS
   REPOSITORY https://github.com/gnuradio/gnuradio4-blocks.git
-  REF main
+  REF 5d20139bc95bc5ef3679e324454460d0807cf949
   GROUPS base
   DEPENDS gnuradio4-library)
 
@@ -51,7 +51,7 @@ gr4_register_module(
   SOURCE_KEY CONTROL_PLANE
   OPTIONS_KEY CONTROL_PLANE
   REPOSITORY https://github.com/gnuradio/gnuradio4-control-plane.git
-  REF main
+  REF 4cee265ae9b4ad8fe53ea495b1cf79267c95bbbd
   GROUPS full applications
   DEPENDS gnuradio4-blocks)
 
@@ -63,7 +63,7 @@ gr4_register_module(
   SOURCE_KEY STUDIO
   OPTIONS_KEY STUDIO_BLOCKS
   REPOSITORY https://github.com/gnuradio/gnuradio4-studio.git
-  REF main
+  REF 006923a25f031e7c7cbae634ecaca4c5c75e3280
   GROUPS full applications
   DEPENDS gnuradio4-blocks
   CMAKE_ARGS

@@ -5,6 +5,11 @@ dependencies, build adapters, optional child-test integration, and membership
 in named module groups.
 `projects.local.cmake` is its ignored, machine-local extension.
 
+The superrepo `main` branch follows component development refs, normally
+`main`. The `maint-4.0` branch pins release components to exact revisions for
+reproducible 4.0 release-series builds. Experimental components outside the
+release set, currently `gr4-incubator`, may remain on a floating ref.
+
 ## Select modules
 
 | Group | Modules |
@@ -102,12 +107,12 @@ repository's package scripts rather than `CMAKE_ARGS`.
 | `GR4_INCUBATOR_CMAKE_ARGS` | empty | Incubator-only CMake arguments |
 | `GR4_CONTROL_PLANE_CMAKE_ARGS` | empty | Control-plane-only CMake arguments |
 | `GR4_STUDIO_BLOCKS_CMAKE_ARGS` | empty | Studio-blocks-only CMake arguments |
-| `GR4_CORE_REPOSITORY`, `GR4_CORE_REF` | GNU Radio, `main` | Core clone source and revision |
-| `GR4_LIBRARY_REPOSITORY`, `GR4_LIBRARY_REF` | GNU Radio, `main` | Library clone source and revision |
-| `GR4_BLOCKS_REPOSITORY`, `GR4_BLOCKS_REF` | GNU Radio, `main` | Blocks clone source and revision |
+| `GR4_CORE_REPOSITORY`, `GR4_CORE_REF` | GNU Radio, pinned commit | Core clone source and revision |
+| `GR4_LIBRARY_REPOSITORY`, `GR4_LIBRARY_REF` | GNU Radio, pinned commit | Library clone source and revision |
+| `GR4_BLOCKS_REPOSITORY`, `GR4_BLOCKS_REF` | GNU Radio, pinned commit | Blocks clone source and revision |
 | `GR4_INCUBATOR_REPOSITORY`, `GR4_INCUBATOR_REF` | GNU Radio, `main` | Incubator clone source and revision |
-| `GR4_CONTROL_PLANE_REPOSITORY`, `GR4_CONTROL_PLANE_REF` | GNU Radio, `main` | Control-plane clone source and revision |
-| `GR4_STUDIO_REPOSITORY`, `GR4_STUDIO_REF` | GNU Radio, `main` | Studio clone source and revision |
+| `GR4_CONTROL_PLANE_REPOSITORY`, `GR4_CONTROL_PLANE_REF` | GNU Radio, pinned commit | Control-plane clone source and revision |
+| `GR4_STUDIO_REPOSITORY`, `GR4_STUDIO_REF` | GNU Radio, pinned commit | Studio clone source and revision |
 | `GR4_BUILD_TESTING` | `ON` | Allow explicitly registered child-project tests |
 | `GR4_FETCH_DEPS` | `ON` | Allow selected dependency downloads |
 | `GR4_WARNINGS_AS_ERRORS` | `ON` | Treat child warnings as errors |
