@@ -10,8 +10,8 @@ body:
 
         Please report component code bugs to their owning repositories instead:
         [Core](https://github.com/gnuradio/gnuradio4-core),
-        [Library](https://github.com/gnuradio/gnuradio4-library),
-        [Blocks](https://github.com/gnuradio/gnuradio4-blocks),
+        [Blocks](https://github.com/gnuradio/gnuradio4-blocks) (algorithm library
+        under `library/`),
         [Incubator](https://github.com/gnuradio/gr4-incubator),
         [Control Plane](https://github.com/gnuradio/gnuradio4-control-plane), or
         [Studio](https://github.com/gnuradio/gnuradio4-studio).

@@ -35,7 +35,7 @@ cmake --preset dev -DGR4_EXTRA_PROJECTS=/path/to/gr4-example
 cmake --build --preset dev --target gr4-example
 ```
 
-Extra projects depend on the core/library/blocks stack and are built by the
+Extra projects depend on the core/blocks stack and are built by the
 aggregate target. The `GR4_EXTRA_PROJECTS` shortcut does not register their
 tests. For test integration or persistent dependency relationships, register a
 module in `projects.local.cmake` and include the `TESTS` keyword.

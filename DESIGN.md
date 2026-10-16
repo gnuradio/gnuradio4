@@ -11,8 +11,8 @@ in the [README diagram](README.md#repository-dependencies).
 
 The manifest's build ordering is more specific than that conceptual view:
 
-- Library consumes the installed Core package.
-- Blocks consumes the installed Core and Library packages.
+- Blocks consumes the installed Core package and builds the algorithm library
+  in its `library/` directory.
 - Incubator and Studio blocks build after Blocks.
 - Control Plane compiles against Core. The superbuild schedules it after
   Blocks so the normal runtime plugin catalog is available.

@@ -5,9 +5,11 @@ test tree after building its profile:
 
 ```sh
 ctest --test-dir build/dev/projects/gnuradio4-core --output-on-failure
-ctest --test-dir build/dev/projects/gnuradio4-library --output-on-failure
 ctest --test-dir build/dev/projects/gnuradio4-blocks --output-on-failure
 ```
+
+The blocks test tree includes the tests of the algorithm library in
+`gnuradio4-blocks` `library/`.
 
 Run the selected workspace's complete integration check with:
 
