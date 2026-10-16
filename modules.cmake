@@ -12,17 +12,6 @@ gr4_register_module(
   GROUPS base)
 
 gr4_register_module(
-  NAME gnuradio4-library
-  TYPE CMAKE
-  SOURCE_DIR gnuradio4-library
-  SOURCE_KEY LIBRARY
-  OPTIONS_KEY LIBRARY
-  REPOSITORY https://github.com/gnuradio/gnuradio4-library.git
-  REF main
-  GROUPS base
-  DEPENDS gnuradio4-core)
-
-gr4_register_module(
   NAME gnuradio4-blocks
   TYPE CMAKE
   SOURCE_DIR gnuradio4-blocks
@@ -31,7 +20,7 @@ gr4_register_module(
   REPOSITORY https://github.com/gnuradio/gnuradio4-blocks.git
   REF main
   GROUPS base
-  DEPENDS gnuradio4-library)
+  DEPENDS gnuradio4-core)
 
 gr4_register_module(
   NAME gr4-incubator

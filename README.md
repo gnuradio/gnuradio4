@@ -15,7 +15,7 @@ This is the official repository and entry point for GNU Radio 4 (GR4).
 development toolkit. GR4 provides a modern C++23 block API, runtime-loadable
 blocks and schedulers, an installed development SDK, and browser and desktop
 Studio applications. This repository is the top-level GR4 workspace: it builds
-the independently maintained core, library, blocks, incubator, control-plane,
+the independently maintained core, blocks, incubator, control-plane,
 and Studio repositories in dependency order into one development prefix.
 
 ## Requirements
@@ -72,8 +72,7 @@ alternative; see [CI and containers](docs/ci.md#docker-and-podman).
 | Component | Purpose |
 | --- | --- |
 | `gnuradio4-core` | Runtime, scheduler, graph/block model, plugins, and SDK |
-| `gnuradio4-library` | Reusable DSP algorithms and support libraries |
-| `gnuradio4-blocks` | Standard signal-processing and utility blocks |
+| `gnuradio4-blocks` | Standard signal-processing and utility blocks; DSP algorithms and support libraries in `library/` |
 | `gr4-incubator` | Experimental blocks, schedulers, and utilities |
 | `gnuradio4-control-plane` | Runtime and HTTP control service |
 | `gnuradio4-studio` | Studio blocks plus browser and desktop application |
@@ -82,9 +81,9 @@ alternative; see [CI and containers](docs/ci.md#docker-and-podman).
 
 ```text
 Foundation
-  [gnuradio4-core]     [gnuradio4-library]
-            \             /
-             \           /
+                    [gnuradio4-core]
+                    /       |      \
+                   /        |       \
 Modules       [blocks] [incubator] [OOTs]
                   .        .         .
                   `------ runtime plugins ------.
@@ -92,8 +91,9 @@ Modules       [blocks] [incubator] [OOTs]
 Applications                          [control-plane] --> [studio]
 ```
 
-Core and library are build dependencies of blocks, incubator, and OOTs; the
-control plane depends on core at build time. Dotted paths are runtime plugin
+Core is a build dependency of blocks, incubator, and OOTs. Incubator and OOTs
+also build against the algorithm library that blocks installs from `library/`.
+The control plane depends on core at build time. Dotted paths are runtime plugin
 discovery.
 
 The superbuild coordinates the repositories it includes; OOTs remain

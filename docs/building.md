@@ -97,7 +97,6 @@ Targets include their upstream dependencies:
 
 ```sh
 cmake --build --preset dev --target gnuradio4-core
-cmake --build --preset dev --target gnuradio4-library
 cmake --build --preset dev --target gnuradio4-blocks
 ```
 

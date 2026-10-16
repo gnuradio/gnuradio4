@@ -9,7 +9,7 @@ in named module groups.
 
 | Group | Modules |
 | --- | --- |
-| `base` | core, library, blocks |
+| `base` | core, blocks (with the algorithm library) |
 | `full` | control-plane, Studio blocks and application |
 | `experimental` | incubator |
 | `applications` | control-plane, Studio blocks and application |
@@ -97,13 +97,11 @@ repository's package scripts rather than `CMAKE_ARGS`.
 | `GR4_EXTRA_CMAKE_ARGS` | empty | CMake arguments for every child project |
 | `GR4_BUILD_PARALLEL_LEVEL` | empty | Nested CMake job limit |
 | `GR4_CORE_CMAKE_ARGS` | empty | Core-only CMake arguments |
-| `GR4_LIBRARY_CMAKE_ARGS` | empty | Library-only CMake arguments |
 | `GR4_BLOCKS_CMAKE_ARGS` | empty | Blocks-only CMake arguments |
 | `GR4_INCUBATOR_CMAKE_ARGS` | empty | Incubator-only CMake arguments |
 | `GR4_CONTROL_PLANE_CMAKE_ARGS` | empty | Control-plane-only CMake arguments |
 | `GR4_STUDIO_BLOCKS_CMAKE_ARGS` | empty | Studio-blocks-only CMake arguments |
 | `GR4_CORE_REPOSITORY`, `GR4_CORE_REF` | GNU Radio, `main` | Core clone source and revision |
-| `GR4_LIBRARY_REPOSITORY`, `GR4_LIBRARY_REF` | GNU Radio, `main` | Library clone source and revision |
 | `GR4_BLOCKS_REPOSITORY`, `GR4_BLOCKS_REF` | GNU Radio, `main` | Blocks clone source and revision |
 | `GR4_INCUBATOR_REPOSITORY`, `GR4_INCUBATOR_REF` | GNU Radio, `main` | Incubator clone source and revision |
 | `GR4_CONTROL_PLANE_REPOSITORY`, `GR4_CONTROL_PLANE_REF` | GNU Radio, `main` | Control-plane clone source and revision |

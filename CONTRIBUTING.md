@@ -16,7 +16,7 @@ fetches, switches branches, or resets an existing checkout.
 | Change | Submit it here? |
 | --- | --- |
 | Core runtime, scheduler, graph, plugin, or SDK code | No — `gnuradio4-core` |
-| Reusable DSP algorithms and support libraries | No — `gnuradio4-library` |
+| Reusable DSP algorithms and support libraries | No — `gnuradio4-blocks`, under `library/` |
 | Standard blocks | No — `gnuradio4-blocks` |
 | Incubator, Control Plane, or Studio code | No — its owning repository |
 | Module manifest, CMake orchestration, presets, or activation | Yes |
