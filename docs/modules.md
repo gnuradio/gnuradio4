@@ -70,7 +70,7 @@ repository root.
 | `REPOSITORY` | Git URL used only when the source is missing |
 | `REF` | Branch, tag, or commit; defaults to `main` |
 | `SOURCE_KEY` | Cache-variable stem for `REPOSITORY` and `REF` overrides |
-| `OPTIONS_KEY` | Cache-variable stem for component CMake arguments |
+| `OPTIONS_KEY` | Cache-variable stem for component CMake arguments and build tree |
 | `GROUPS` | Named groups that select the module |
 | `DEPENDS` | Required registered modules, selected automatically |
 | `OPTIONAL_DEPENDS` | Dependencies used only when independently selected |
@@ -107,6 +107,7 @@ repository's package scripts rather than `CMAKE_ARGS`.
 | `GR4_CONTROL_PLANE_REPOSITORY`, `GR4_CONTROL_PLANE_REF` | GNU Radio, `main` | Control-plane clone source and revision |
 | `GR4_STUDIO_REPOSITORY`, `GR4_STUDIO_REF` | GNU Radio, `main` | Studio clone source and revision |
 | `GR4_CORE_SOURCE_DIR`, `GR4_LIBRARY_SOURCE_DIR`, ... | empty | Existing checkout to build instead of the one below `GR4_SOURCE_ROOT` |
+| `GR4_CORE_BINARY_DIR`, `GR4_LIBRARY_BINARY_DIR`, ... | empty | Build tree to use instead of the one below the superbuild's binary directory |
 | `GR4_BUILD_TESTING` | `ON` | Allow explicitly registered child-project tests |
 | `GR4_FETCH_DEPS` | `ON` | Allow selected dependency downloads |
 | `GR4_WARNINGS_AS_ERRORS` | `ON` | Treat child warnings as errors |
@@ -126,6 +127,19 @@ key under a preset's `cacheVariables`. The path is the repository root, also for
 modules with a `SOURCE_SUBDIR`. It is never cloned into, so configure fails if
 the module is not already there. Like the repository variables it belongs to the
 checkout, so `GR4_STUDIO_SOURCE_DIR` moves both Studio modules.
+
+`GR4_<OPTIONS_KEY>_BINARY_DIR` builds a module in a given directory instead of
+`projects/<module>` below the superbuild's binary directory, for example
+`-DGR4_CORE_BINARY_DIR=C:/dev/gnuradio/gr-core/build`. The directory is created
+if missing, and an existing build tree is reused as it stands. A build tree
+belongs to one module rather than to a checkout, so the key is the
+`OPTIONS_KEY`, not the `SOURCE_KEY`: the Studio-blocks module is moved by
+`GR4_STUDIO_BLOCKS_BINARY_DIR`, while the Node application module has no build
+tree to move. Configure fails if two modules name the same directory, or if a
+module's build tree is its own source tree. The superbuild's own bookkeeping,
+the ExternalProject stamps, stays under the superbuild's binary directory, so
+`<module>-clean` keeps working across a relocated build tree. Component
+packaging follows the module automatically.
 
 `GR4_EXTRA_CMAKE_ARGS` applies a child-project option to all CMake modules.
 For example:

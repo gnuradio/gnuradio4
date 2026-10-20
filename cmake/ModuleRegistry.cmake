@@ -122,8 +122,18 @@ function(gr4_register_module)
       "${cmake_args_variable}"
       ""
       CACHE STRING "Additional CMake arguments passed only to ${MODULE_NAME}")
+
+    # Moves the build tree; empty keeps it below the superbuild's binary
+    # directory. A build tree belongs to one module rather than to a checkout,
+    # so modules sharing sources still get a variable each.
+    set(binary_dir_variable "GR4_${MODULE_OPTIONS_KEY}_BINARY_DIR")
+    set(
+      "${binary_dir_variable}"
+      ""
+      CACHE PATH "Build tree for ${MODULE_NAME} instead of the one below the superbuild's binary directory")
   else()
     set(cmake_args_variable "")
+    set(binary_dir_variable "")
   endif()
 
   # Points the module at a checkout anywhere on disk; empty keeps SOURCE_DIR
@@ -149,6 +159,7 @@ function(gr4_register_module)
   _gr4_set_module_property("${MODULE_NAME}" REF_VARIABLE "${ref_variable}")
   _gr4_set_module_property("${MODULE_NAME}" SOURCE_DIR_VARIABLE "${source_dir_variable}")
   _gr4_set_module_property("${MODULE_NAME}" CMAKE_ARGS_VARIABLE "${cmake_args_variable}")
+  _gr4_set_module_property("${MODULE_NAME}" BINARY_DIR_VARIABLE "${binary_dir_variable}")
   _gr4_set_module_property("${MODULE_NAME}" CMAKE_ARGS "${MODULE_CMAKE_ARGS}")
   _gr4_set_module_property("${MODULE_NAME}" GROUPS "${MODULE_GROUPS}")
   _gr4_set_module_property("${MODULE_NAME}" DEPENDS "${MODULE_DEPENDS}")
@@ -291,6 +302,7 @@ function(gr4_realize_modules)
     _gr4_get_module_property(optional_dependencies "${name}" OPTIONAL_DEPENDS)
     _gr4_get_module_property(module_tests "${name}" TESTS)
     _gr4_get_module_property(source_dir_variable "${name}" SOURCE_DIR_VARIABLE)
+    _gr4_get_module_property(binary_dir_variable "${name}" BINARY_DIR_VARIABLE)
 
     if(module_source_provider)
       # the provider owns the shared checkout, so moving it moves this module too
@@ -346,6 +358,17 @@ function(gr4_realize_modules)
         set(source_subdir_argument SOURCE_SUBDIR "${module_source_subdir}")
       endif()
 
+      set(binary_dir_argument "")
+      if(binary_dir_variable AND NOT "${${binary_dir_variable}}" STREQUAL "")
+        set(module_binary_dir "${${binary_dir_variable}}")
+        cmake_path(
+          ABSOLUTE_PATH module_binary_dir
+          BASE_DIRECTORY "${CMAKE_SOURCE_DIR}"
+          NORMALIZE)
+        set(binary_dir_argument BINARY_DIR "${module_binary_dir}")
+        message(STATUS "${name}: building in ${module_binary_dir}")
+      endif()
+
       set(repository_arguments "")
       if(repository_variable)
         set(repository_arguments
@@ -362,6 +385,7 @@ function(gr4_realize_modules)
         "${name}"
         SOURCE_DIR "${module_source_dir}"
         ${source_subdir_argument}
+        ${binary_dir_argument}
         ${repository_arguments}
         DEPENDS ${module_dependencies}
         CMAKE_ARGS ${component_cmake_args}

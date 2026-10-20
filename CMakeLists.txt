@@ -85,13 +85,14 @@ endif()
 include(cmake/PackageGr4.cmake)
 
 set_property(GLOBAL PROPERTY GR4_PROJECT_TARGETS "")
+set_property(GLOBAL PROPERTY GR4_PROJECT_BINARY_DIRS "")
 set_property(GLOBAL PROPERTY GR4_SOURCE_TARGETS "")
 set_property(GLOBAL PROPERTY GR4_CTEST_DIRS "")
 set_property(GLOBAL PROPERTY GR4_TEST_TARGETS "")
 
 function(gr4_add_project name)
   set(options TESTS)
-  set(one_value_args SOURCE_DIR SOURCE_SUBDIR GIT_REPOSITORY GIT_TAG)
+  set(one_value_args SOURCE_DIR SOURCE_SUBDIR BINARY_DIR GIT_REPOSITORY GIT_TAG)
   set(multi_value_args DEPENDS CMAKE_ARGS)
   cmake_parse_arguments(PROJECT "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
@@ -106,7 +107,26 @@ function(gr4_add_project name)
   endif()
 
   cmake_path(ABSOLUTE_PATH PROJECT_SOURCE_DIR BASE_DIRECTORY "${CMAKE_SOURCE_DIR}" NORMALIZE)
-  set(project_binary_dir "${CMAKE_BINARY_DIR}/projects/${name}")
+
+  # cmake_parse_arguments clears the shadowed built-in PROJECT_BINARY_DIR, so an
+  # empty value here always means the caller passed no override. The stamp dir
+  # stays with the superbuild: it is our bookkeeping, not the module's output.
+  if(PROJECT_BINARY_DIR)
+    cmake_path(ABSOLUTE_PATH PROJECT_BINARY_DIR BASE_DIRECTORY "${CMAKE_SOURCE_DIR}" NORMALIZE)
+    set(project_binary_dir "${PROJECT_BINARY_DIR}")
+  else()
+    set(project_binary_dir "${CMAKE_BINARY_DIR}/projects/${name}")
+  endif()
+  if(project_binary_dir STREQUAL PROJECT_SOURCE_DIR)
+    message(FATAL_ERROR
+      "Build tree for '${name}' is its source tree '${project_binary_dir}'")
+  endif()
+  get_property(claimed_binary_dirs GLOBAL PROPERTY GR4_PROJECT_BINARY_DIRS)
+  if(project_binary_dir IN_LIST claimed_binary_dirs)
+    message(FATAL_ERROR
+      "Build tree '${project_binary_dir}' for '${name}' is already used by another project")
+  endif()
+  set_property(GLOBAL APPEND PROPERTY GR4_PROJECT_BINARY_DIRS "${project_binary_dir}")
   set(project_stamp_dir "${CMAKE_BINARY_DIR}/stamp/${name}")
   set(project_cmake_file "${PROJECT_SOURCE_DIR}/CMakeLists.txt")
   set(project_source_marker "CMakeLists.txt")
