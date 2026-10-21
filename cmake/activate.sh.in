@@ -12,14 +12,24 @@ export LD_LIBRARY_PATH="${_gr4_libdir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 export DYLD_LIBRARY_PATH="${_gr4_libdir}${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
 export GNURADIO4_PLUGIN_DIRECTORIES="${_gr4_libdir}/gnuradio-4/plugins:${_gr4_libdir}${GNURADIO4_PLUGIN_DIRECTORIES:+:${GNURADIO4_PLUGIN_DIRECTORIES}}"
 
-[[ "${SHELLNAME}" = "zsh" ]] && setopt NULL_GLOB
-
-for _gr4_python_dir in "${_gr4_libdir}"/python*/site-packages "${_gr4_libdir}"/python*/dist-packages; do
-  if [ -d "${_gr4_python_dir}" ]; then
-    export PYTHONPATH="${_gr4_python_dir}${PYTHONPATH:+:${PYTHONPATH}}"
+# zsh aborts a command whose glob matches nothing ("no matches found"), while
+# bash and POSIX sh keep the pattern as a literal word. Expand the Python
+# directories in a function so zsh can enable NULL_GLOB for just this lookup
+# without changing the options of the shell that sourced this file.
+_gr4_add_python_paths() {
+  if [ -n "${ZSH_VERSION:-}" ]; then
+    setopt local_options null_glob
   fi
-done
+  for _gr4_python_dir in "$1"/python*/site-packages "$1"/python*/dist-packages; do
+    if [ -d "${_gr4_python_dir}" ]; then
+      export PYTHONPATH="${_gr4_python_dir}${PYTHONPATH:+:${PYTHONPATH}}"
+    fi
+  done
+  unset _gr4_python_dir
+}
 
+_gr4_add_python_paths "${_gr4_libdir}"
+
+unset -f _gr4_add_python_paths
 unset _gr4_prefix
 unset _gr4_libdir
-unset _gr4_python_dir
