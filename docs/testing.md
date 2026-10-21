@@ -25,6 +25,16 @@ nonempty. Component unit and QA tests, including Studio lint and Vitest, remain
 in their owning repositories' CI. The `release` profile disables explicitly
 registered child tests; all other supplied profiles permit them.
 
+`check` also runs `tests/activate-smoke.sh` on Unix hosts. It renders
+`cmake/activate.sh.in` against throw-away prefixes and sources the result in
+each of `sh`, `bash`, `dash` and `zsh` that is installed, so a shell-specific
+mistake in the activation script (for example zsh's "no matches found" for an
+unmatched glob) fails the gate. The script can also be run on its own:
+
+```sh
+tests/activate-smoke.sh
+```
+
 `check` additionally builds and runs `tests/oot-smoke`, an external consumer
 that discovers all three installed CMake packages. It verifies the installed
 SDK rather than allowing headers or CMake targets from source trees to leak

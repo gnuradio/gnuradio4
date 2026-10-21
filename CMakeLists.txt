@@ -356,6 +356,15 @@ add_custom_target(gr4 ALL DEPENDS ${project_targets})
 add_custom_target(sources DEPENDS ${source_targets})
 
 set(integration_test_targets "")
+if(UNIX)
+  add_custom_target(
+    activate-smoke
+    COMMAND /bin/sh "${CMAKE_SOURCE_DIR}/tests/activate-smoke.sh"
+    USES_TERMINAL
+    COMMENT "Sourcing the activation script in every available shell")
+  list(APPEND integration_test_targets activate-smoke)
+endif()
+
 if("gnuradio4-blocks" IN_LIST GR4_SELECTED_MODULES)
   set(smoke_binary_dir "${CMAKE_BINARY_DIR}/tests/oot-smoke")
   set(smoke_cmake_args
