@@ -341,6 +341,9 @@ function(gr4_realize_modules)
       message(STATUS "${name}: using sources in ${module_source_dir}")
     endif()
 
+    # the packaging code needs the resolved path, which exists only here
+    _gr4_set_module_property("${name}" RESOLVED_SOURCE_DIR "${module_source_dir}")
+
     foreach(dependency IN LISTS optional_dependencies)
       if(dependency IN_LIST selected_modules)
         list(APPEND module_dependencies "${dependency}")

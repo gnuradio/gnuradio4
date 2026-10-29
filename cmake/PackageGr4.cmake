@@ -38,6 +38,17 @@ set(GR4_BUNDLE_APP_ID
     CACHE STRING "Inno Setup AppId of the unified GNU Radio 4 installer")
 mark_as_advanced(GR4_BUNDLE_APP_ID)
 
+# Debug binaries come from a second superbuild tree, built with
+# CMAKE_BUILD_TYPE=Debug: one tree cannot hold two configurations, and the
+# presets already give each its own binary dir and install prefix.
+set(GR4_DEBUG_PACKAGING_DIR
+    ""
+    CACHE PATH "packaging/components of a Debug superbuild tree; empty leaves the debug checkboxes out")
+
+set(GR4_BUNDLE_ICON_SOURCE
+    ""
+    CACHE FILEPATH "PNG the installer icon is generated from; empty uses the logo shipped with the core module")
+
 # never reuse a module installer's identifier here and never change it between
 # releases: pkgutil identifies the product by it
 set(GR4_BUNDLE_IDENTIFIER
@@ -84,6 +95,12 @@ if(GR_ENABLE_PACKAGING)
   endif()
 endif()
 
+# project(... NONE) never sets MSVC, and /DEBUG would break a MinGW build
+set(gr4_msvc_toolchain FALSE)
+if(WIN32 AND (NOT CMAKE_CXX_COMPILER OR CMAKE_CXX_COMPILER MATCHES "cl(\.exe)?$"))
+  set(gr4_msvc_toolchain TRUE)
+endif()
+
 set_property(GLOBAL PROPERTY GR4_PACKAGE_TARGETS "")
 
 # Adds <name>-package for a CMake module. Call right after its ExternalProject_Add.
@@ -117,6 +134,27 @@ function(gr4_package_project name binary_dir)
   ExternalProject_Add_StepTargets("${name}" package)
 
   set_property(GLOBAL APPEND PROPERTY GR4_PACKAGE_TARGETS "${name}-package")
+endfunction()
+
+# CMake arguments every child needs when it is going to be packaged. Appended
+# by gr4_add_project; empty when packaging is off, so ordinary builds are
+# unaffected.
+function(gr4_packaging_cmake_args output)
+  set(arguments "")
+  if(GR4_PACKAGING_ENABLED AND WIN32)
+    # release and debug libraries share one bin/, so the debug ones need
+    # distinct names: gnuradio-core.dll beside gnuradio-cored.dll
+    list(APPEND arguments "-DCMAKE_DEBUG_POSTFIX:STRING=d")
+    if(gr4_msvc_toolchain)
+      # an optimised build emits no PDB by default, which would leave the
+      # symbols component with nothing to ship
+      list(APPEND arguments
+           "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT:STRING=ProgramDatabase"
+           "-DCMAKE_SHARED_LINKER_FLAGS:STRING=/DEBUG"
+           "-DCMAKE_EXE_LINKER_FLAGS:STRING=/DEBUG")
+    endif()
+  endif()
+  set("${output}" "${arguments}" PARENT_SCOPE)
 endfunction()
 
 # Writes whatever the bundle needs at configure time and adds gr4-installer.
@@ -210,78 +248,135 @@ function(_gr4_add_macos_installer_target modules package_targets)
     COMMENT "Composing the unified GNU Radio 4 installer")
 endfunction()
 
-# The Windows bundle, unchanged.
+# The Windows bundle.
 function(_gr4_add_windows_installer_target modules package_targets)
+  # Install types are curated layouts rather than raw group names: a user
+  # picking "Typical" should not have to know what a module group is. Groups
+  # still decide membership, so modules.cmake stays the single source of truth.
+  set(type_ids typical complete runtime)
+  set(type_description_typical "Typical installation")
+  set(type_description_complete "Complete installation")
+  set(type_description_runtime "Runtime only")
+
+  # every group that is not already covered by typical or complete
   set(groups "")
   foreach(name IN LISTS modules)
     _gr4_get_module_property(module_groups "${name}" GROUPS)
     foreach(group IN LISTS module_groups)
-      if(NOT group IN_LIST groups AND NOT group STREQUAL "custom")
+      if(NOT group IN_LIST groups AND NOT group MATCHES "^(base|full|custom)$")
         list(APPEND groups "${group}")
       endif()
     endforeach()
   endforeach()
 
-  # A type installs its group plus what that group needs, which is what the
-  # same name means in GR4_MODULE_GROUPS.
-  set(types_section "[Types]\n")
-  foreach(name IN LISTS modules)
-    set(module_types_${name} "")
-  endforeach()
   foreach(group IN LISTS groups)
-    set(members "")
+    string(MAKE_C_IDENTIFIER "${group}" group_id)
+    string(SUBSTRING "${group}" 0 1 first_letter)
+    string(SUBSTRING "${group}" 1 -1 other_letters)
+    string(TOUPPER "${first_letter}" first_letter)
+    list(APPEND type_ids "${group_id}")
+    set(type_description_${group_id} "${first_letter}${other_letters}")
+  endforeach()
+  list(APPEND type_ids custom)
+  set(type_description_custom "Custom installation")
+
+  # which modules each group-derived type installs: the group plus what it
+  # needs, which is what the same name means in GR4_MODULE_GROUPS
+  set(closure_groups ${groups} base)
+  foreach(group IN LISTS closure_groups)
+    set(members_${group} "")
     foreach(name IN LISTS modules)
       _gr4_get_module_property(module_groups "${name}" GROUPS)
       if(group IN_LIST module_groups)
-        list(APPEND members "${name}")
+        list(APPEND members_${group} "${name}")
       endif()
     endforeach()
-
     set(members_changed TRUE)
     while(members_changed)
       set(members_changed FALSE)
-      foreach(name IN LISTS members)
+      foreach(name IN LISTS members_${group})
         _gr4_get_module_property(module_dependencies "${name}" DEPENDS)
         foreach(dependency IN LISTS module_dependencies)
-          if(dependency IN_LIST modules AND NOT dependency IN_LIST members)
-            list(APPEND members "${dependency}")
+          if(dependency IN_LIST modules AND NOT dependency IN_LIST members_${group})
+            list(APPEND members_${group} "${dependency}")
             set(members_changed TRUE)
           endif()
         endforeach()
       endforeach()
     endwhile()
-
-    string(MAKE_C_IDENTIFIER "${group}" type_id)
-    string(SUBSTRING "${group}" 0 1 first_letter)
-    string(SUBSTRING "${group}" 1 -1 other_letters)
-    string(TOUPPER "${first_letter}" first_letter)
-    string(APPEND types_section
-      "Name: \"${type_id}\"; Description: \"${first_letter}${other_letters}\"\n")
-    foreach(name IN LISTS members)
-      list(APPEND module_types_${name} "${type_id}")
-    endforeach()
   endforeach()
-  string(APPEND types_section
-    "Name: \"custom\"; Description: \"Custom installation\"; Flags: iscustom\n\n")
 
-  # Components are only known once the installers exist, so the build-time
-  # generator refers to these instead of the registry.
+  set(types_content "# Generated by gr-super cmake/PackageGr4.cmake, do not edit.
+")
+  string(APPEND types_content "set(GR4_BUNDLE_TYPE_IDS [==[${type_ids}]==])
+")
+  foreach(type_id IN LISTS type_ids)
+    string(APPEND types_content
+      "set(GR4_BUNDLE_TYPE_DESCRIPTION_${type_id} [==[${type_description_${type_id}}]==])
+")
+  endforeach()
+
+  # Per module: the types that install it, the types that also take its
+  # development files, and the types that take its debug symbols. Debug
+  # binaries belong to no preset at all; they are always an explicit choice.
   foreach(name IN LISTS modules)
-    string(MAKE_C_IDENTIFIER "${name}" module_id)
-    list(APPEND module_types_${name} custom)
-    list(JOIN module_types_${name} " " module_types)
-    string(APPEND types_section "#define Gr4Types_${module_id} \"${module_types}\"\n")
-  endforeach()
+    set(module_types complete runtime)
+    if(name IN_LIST members_base)
+      list(APPEND module_types typical)
+    endif()
+    foreach(group IN LISTS groups)
+      if(name IN_LIST members_${group})
+        string(MAKE_C_IDENTIFIER "${group}" group_id)
+        list(APPEND module_types "${group_id}")
+      endif()
+    endforeach()
+    list(APPEND module_types custom)
 
-  file(CONFIGURE
-    OUTPUT "${GR4_PACKAGING_DIR}/gr4_bundle_types.iss"
-    CONTENT "; Generated by gr-super cmake/PackageGr4.cmake, do not edit.\n${types_section}"
-    @ONLY)
+    # a runtime-only install is exactly the one that leaves headers out
+    set(develop_types ${module_types})
+    list(REMOVE_ITEM develop_types runtime)
+
+    string(MAKE_C_IDENTIFIER "${name}" module_id)
+    string(APPEND types_content
+      "set(GR4_MODULE_TYPES_${module_id} [==[${module_types}]==])
+"
+      "set(GR4_MODULE_DEVELOP_TYPES_${module_id} [==[${develop_types}]==])
+"
+      "set(GR4_MODULE_SYMBOL_TYPES_${module_id} [==[complete;custom]==])
+")
+  endforeach()
+  file(WRITE "${GR4_PACKAGING_DIR}/gr4_bundle_types.cmake" "${types_content}")
+
+  # The icon is generated from the core module's logo, the only image in the
+  # workspace, so it is only available once that module's sources are present.
+  set(icon_source "${GR4_BUNDLE_ICON_SOURCE}")
+  if(icon_source STREQUAL "")
+    foreach(name IN LISTS modules)
+      _gr4_get_module_property(module_source_dir "${name}" RESOLVED_SOURCE_DIR)
+      if(EXISTS "${module_source_dir}/docs/logo.png")
+        set(icon_source "${module_source_dir}/docs/logo.png")
+        break()
+      endif()
+    endforeach()
+  endif()
+
+  set(icon_command "")
+  if(icon_source STREQUAL "")
+    message(STATUS "No logo found for the installer icon; the bundle will use Inno Setup's own")
+  else()
+    find_program(GR4_POWERSHELL_EXECUTABLE NAMES powershell.exe DOC "Windows PowerShell" REQUIRED)
+    set(icon_command
+        COMMAND
+        "${GR4_POWERSHELL_EXECUTABLE}" -NoProfile -ExecutionPolicy Bypass -File
+        "${GR4_PACKAGING_SCRIPT_DIR}/MakeGr4Icon.ps1" -Logo "${icon_source}" -OutFile
+        "${GR4_PACKAGING_DIR}/gr4.ico")
+  endif()
 
   # module names cannot contain ',' so it is a safe separator on any shell
   list(JOIN modules "," modules_argument)
   add_custom_target(
     gr4-installer
+    ${icon_command}
     COMMAND
       "${CMAKE_COMMAND}"
       "-DPACKAGING_DIR:PATH=${GR4_PACKAGING_DIR}"
@@ -289,7 +384,9 @@ function(_gr4_add_windows_installer_target modules package_targets)
       "-DMODULES:STRING=${modules_argument}"
       "-DBUNDLE_VERSION:STRING=${GR4_BUNDLE_VERSION}"
       "-DBUNDLE_APP_ID:STRING=${GR4_BUNDLE_APP_ID}"
+      "-DDEBUG_COMPONENTS_DIR:PATH=${GR4_DEBUG_PACKAGING_DIR}"
       "-DOUTPUT_DIR:PATH=${CMAKE_BINARY_DIR}"
+      "-DSCRIPT_DIR:PATH=${GR4_PACKAGING_SCRIPT_DIR}"
       "-DTEMPLATE:FILEPATH=${GR4_PACKAGING_SCRIPT_DIR}/gr4_bundle.iss.in"
       -P "${GR4_PACKAGING_SCRIPT_DIR}/GenerateBundleIss.cmake"
     COMMAND "${GR4_ISCC_EXECUTABLE}" /Q "${GR4_PACKAGING_DIR}/gr4_bundle.iss"

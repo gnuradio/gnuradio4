@@ -188,6 +188,9 @@ function(gr4_add_project name)
       "-DUB_SANITIZER:BOOL=${GR4_UB_SANITIZER}"
       "-DGR_PACKAGING:BOOL=${GR_ENABLE_PACKAGING}")
 
+  gr4_packaging_cmake_args(packaging_cmake_args)
+  list(APPEND cmake_args ${packaging_cmake_args})
+
   if(APPLE)
     # so the component packages a module builds carry the same signature as the
     # bundle composed around them
