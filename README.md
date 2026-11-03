@@ -58,9 +58,11 @@ docker run --rm -p 8080:8080 ghcr.io/gnuradio/gnuradio4-studio:latest
 
 Then visit <http://localhost:8080>.
 
-The initial build clones missing component repositories into `src/`. After a
-checkout exists, the superbuild leaves its Git state alone; you choose when to
-fetch, update, or switch its branch.
+The initial build clones missing component repositories, and the gr-deps
+dependency superbuild, into `src/`, then builds the third-party dependencies
+before the components themselves. After a checkout exists, the superbuild
+leaves its Git state alone; you choose when to fetch, update, or switch its
+branch.
 
 Docker is the documented container host. Podman is supported as a rootless
 alternative; see [CI and containers](docs/ci.md#docker-and-podman).
@@ -82,6 +84,7 @@ and resource limits.
 | `gr4-incubator` | Experimental blocks, schedulers, and utilities |
 | `gnuradio4-control-plane` | Runtime and HTTP control service |
 | `gnuradio4-studio` | Studio blocks plus browser and desktop application |
+| `gr-deps` | Third-party dependencies of all of the above, built from source |
 
 ## Repository dependencies
 
@@ -100,6 +103,11 @@ Applications                          [control-plane] --> [studio]
 Core and library are build dependencies of blocks, incubator, and OOTs; the
 control plane depends on core at build time. Dotted paths are runtime plugin
 discovery.
+
+Third-party dependencies sit below all of this. The modules do not build their
+own: the `gr-deps` superbuild builds what the selected modules declare into the
+shared prefix first, so every module compiles against one set. See
+[third-party dependencies](docs/building.md#third-party-dependencies).
 
 The superbuild coordinates the repositories it includes; OOTs remain
 independently owned and can be added to the workspace as described in the

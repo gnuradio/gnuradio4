@@ -1,5 +1,10 @@
 # Ordered GNU Radio 4 module manifest. Dependencies must be declared before
 # consumers so the generated ExternalProject graph remains easy to inspect.
+#
+# DEPS_GROUPS names the gr-deps groups a module needs built into the prefix
+# before it configures. It is not inherited along DEPENDS: a module declares
+# what it consumes itself, and the superbuild builds the union over the
+# selection (see cmake/GrDeps.cmake).
 
 gr4_register_module(
   NAME gnuradio4-core
@@ -9,6 +14,7 @@ gr4_register_module(
   OPTIONS_KEY CORE
   REPOSITORY https://github.com/gnuradio/gnuradio4-core.git
   REF main
+  DEPS_GROUPS core
   GROUPS base)
 
 gr4_register_module(
@@ -19,6 +25,7 @@ gr4_register_module(
   OPTIONS_KEY LIBRARY
   REPOSITORY https://github.com/gnuradio/gnuradio4-library.git
   REF main
+  DEPS_GROUPS core
   GROUPS base
   DEPENDS gnuradio4-core)
 
@@ -30,6 +37,7 @@ gr4_register_module(
   OPTIONS_KEY BLOCKS
   REPOSITORY https://github.com/gnuradio/gnuradio4-blocks.git
   REF main
+  DEPS_GROUPS core blocks
   GROUPS base
   DEPENDS gnuradio4-library)
 
@@ -41,6 +49,7 @@ gr4_register_module(
   OPTIONS_KEY INCUBATOR
   REPOSITORY https://github.com/gnuradio/gr4-incubator.git
   REF main
+  DEPS_GROUPS core blocks
   GROUPS full experimental
   DEPENDS gnuradio4-blocks)
 
@@ -52,6 +61,7 @@ gr4_register_module(
   OPTIONS_KEY CONTROL_PLANE
   REPOSITORY https://github.com/gnuradio/gnuradio4-control-plane.git
   REF main
+  DEPS_GROUPS core control-plane
   GROUPS full applications
   DEPENDS gnuradio4-blocks)
 
@@ -64,6 +74,8 @@ gr4_register_module(
   OPTIONS_KEY STUDIO_BLOCKS
   REPOSITORY https://github.com/gnuradio/gnuradio4-studio.git
   REF main
+  # builds against GnuRadioBlockLib, which gr-core installs, not gnuradio4Blocks
+  DEPS_GROUPS core studio
   GROUPS full applications
   DEPENDS gnuradio4-blocks
   CMAKE_ARGS

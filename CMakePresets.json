@@ -12,7 +12,7 @@
       "generator": "Ninja",
       "cacheVariables": {
         "BUILD_SHARED_LIBS": "ON",
-        "GR4_FETCH_DEPS": "ON",
+        "GR4_BUILD_DEPS": "ON",
         "GR4_ADDRESS_SANITIZER": "OFF",
         "GR4_UB_SANITIZER": "OFF",
         "GR4_MODULE_GROUPS": "base"
@@ -81,7 +81,7 @@
       "binaryDir": "${sourceDir}/build/offline",
       "cacheVariables": {
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/offline",
-        "GR4_FETCH_DEPS": "OFF"
+        "GR4_BUILD_DEPS": "OFF"
       }
     },
     {

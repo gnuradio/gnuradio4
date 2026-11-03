@@ -53,7 +53,6 @@ if(NOT gr4_effective_build_parallel_level STREQUAL ""
 endif()
 
 option(GR4_BUILD_TESTING "Build tests in the child projects" ON)
-option(GR4_FETCH_DEPS "Allow child projects to fetch missing dependencies" ON)
 option(GR4_WARNINGS_AS_ERRORS "Build child projects with warnings as errors" ON)
 option(GR4_ADDRESS_SANITIZER "Build child projects with AddressSanitizer" OFF)
 option(GR4_UB_SANITIZER "Build child projects with UndefinedBehaviorSanitizer" OFF)
@@ -78,6 +77,15 @@ if(install_libdir_is_absolute)
   set(GR4_INSTALL_LIBDIR_FULL "${CMAKE_INSTALL_LIBDIR}")
 else()
   set(GR4_INSTALL_LIBDIR_FULL "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+endif()
+
+include(cmake/GrDeps.cmake)
+
+# A test binary loads the shared dependencies gr-deps built, so their library
+# directory is searched alongside GR4's whenever the two prefixes differ.
+set(gr4_runtime_libdirs "${GR4_INSTALL_LIBDIR_FULL}")
+if(NOT GR4_DEPS_LIBDIR_FULL STREQUAL GR4_INSTALL_LIBDIR_FULL)
+  string(APPEND gr4_runtime_libdirs ":${GR4_DEPS_LIBDIR_FULL}")
 endif()
 
 set_property(GLOBAL PROPERTY GR4_PROJECT_TARGETS "")
@@ -138,11 +146,25 @@ function(gr4_add_project name)
       "Missing ${project_cmake_file} for '${name}' and no GIT_REPOSITORY was provided")
   endif()
 
-  set(prefix_path "${CMAKE_INSTALL_PREFIX}")
+  # No module configures before its third-party dependencies are installed.
+  if(TARGET "${GR4_DEPS_TARGET_NAME}")
+    list(APPEND PROJECT_DEPENDS "${GR4_DEPS_TARGET_NAME}")
+  endif()
+
+  # They are then found the way the modules find each other, through the
+  # prefix, which is the same one unless GR4_DEPS_INSTALL_PREFIX points
+  # elsewhere.
+  set(prefix_path "${CMAKE_INSTALL_PREFIX}" "${GR4_DEPS_INSTALL_PREFIX}")
   if(CMAKE_PREFIX_PATH)
     list(APPEND prefix_path ${CMAKE_PREFIX_PATH})
   endif()
+  list(REMOVE_DUPLICATES prefix_path)
   list(JOIN prefix_path "|" prefix_path_arg)
+
+  set(program_path "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
+                   "${GR4_DEPS_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}")
+  list(REMOVE_DUPLICATES program_path)
+  list(JOIN program_path "|" program_path_arg)
 
   set(child_testing OFF)
   if(PROJECT_TESTS AND GR4_BUILD_TESTING)
@@ -153,12 +175,11 @@ function(gr4_add_project name)
       "-DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}"
       "-DCMAKE_INSTALL_LIBDIR:STRING=${CMAKE_INSTALL_LIBDIR}"
       "-DCMAKE_PREFIX_PATH:STRING=${prefix_path_arg}"
-      "-DCMAKE_PROGRAM_PATH:PATH=${CMAKE_INSTALL_PREFIX}/bin"
+      "-DCMAKE_PROGRAM_PATH:STRING=${program_path_arg}"
       "-DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}"
       "-DBUILD_SHARED_LIBS:BOOL=${BUILD_SHARED_LIBS}"
       "-DENABLE_TESTING:BOOL=${child_testing}"
       "-DPKG_CONFIG_USE_CMAKE_PREFIX_PATH:BOOL=ON"
-      "-DGR_USE_FETCHCONTENT_DEPS:BOOL=${GR4_FETCH_DEPS}"
       "-DWARNINGS_AS_ERRORS:BOOL=${GR4_WARNINGS_AS_ERRORS}"
       "-DADDRESS_SANITIZER:BOOL=${GR4_ADDRESS_SANITIZER}"
       "-DUB_SANITIZER:BOOL=${GR4_UB_SANITIZER}")
@@ -269,14 +290,47 @@ function(gr4_add_node_project name)
       "GIT_REPOSITORY or SOURCE_PROVIDER")
   endif()
 
+  # The npm build runs tools and native addons out of the prefix, so it waits
+  # for the dependencies as the CMake modules do.
+  if(TARGET "${GR4_DEPS_TARGET_NAME}")
+    list(APPEND PROJECT_DEPENDS "${GR4_DEPS_TARGET_NAME}")
+  endif()
+
   set(node_stamp_dir "${CMAKE_BINARY_DIR}/stamp/${name}")
+  # These are environment search paths, so they are separated the way the host
+  # separates them, not the way CMake separates a list. On Windows the two
+  # collide, and the separator is escaped so an assignment stays a single
+  # argument when the command list below is expanded.
+  if(CMAKE_HOST_WIN32)
+    set(node_separator [[\;]])
+  else()
+    set(node_separator ":")
+  endif()
+  set(node_prefix_path "${CMAKE_INSTALL_PREFIX}")
+  set(node_bin_dirs "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}")
+  if(NOT GR4_DEPS_INSTALL_PREFIX STREQUAL CMAKE_INSTALL_PREFIX)
+    string(APPEND node_prefix_path "${node_separator}${GR4_DEPS_INSTALL_PREFIX}")
+    list(APPEND node_bin_dirs "${GR4_DEPS_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}")
+  endif()
+
+  # PATH is prepended a directory at a time instead of rebuilt around
+  # $ENV{PATH}: cmake -E env inserts the host separator itself, so the host's
+  # own PATH never has to survive a round trip through a CMake list. The last
+  # prepend ends up first, so the directories are applied back to front.
+  set(node_path_args "")
+  set(node_reversed_bin_dirs ${node_bin_dirs})
+  list(REVERSE node_reversed_bin_dirs)
+  foreach(node_bin_dir IN LISTS node_reversed_bin_dirs)
+    list(APPEND node_path_args --modify "PATH=path_list_prepend:${node_bin_dir}")
+  endforeach()
+
   set(node_environment
       "${CMAKE_COMMAND}" -E env
+      ${node_path_args}
       "GR4_PREFIX=${CMAKE_INSTALL_PREFIX}"
-      "GR4_PREFIX_PATH=${CMAKE_INSTALL_PREFIX}"
-      "PATH=${CMAKE_INSTALL_PREFIX}/bin:$ENV{PATH}"
-      "CMAKE_PREFIX_PATH=${CMAKE_INSTALL_PREFIX}"
-      "PKG_CONFIG_PATH=${GR4_INSTALL_LIBDIR_FULL}/pkgconfig:${CMAKE_INSTALL_PREFIX}/share/pkgconfig")
+      "GR4_PREFIX_PATH=${node_prefix_path}"
+      "CMAKE_PREFIX_PATH=${node_prefix_path}"
+      "PKG_CONFIG_PATH=${GR4_INSTALL_LIBDIR_FULL}/pkgconfig${node_separator}${CMAKE_INSTALL_PREFIX}/share/pkgconfig")
 
   ExternalProject_Add(
     "${name}"
@@ -341,6 +395,7 @@ foreach(source_dir IN LISTS GR4_EXTRA_PROJECTS)
     NAME "${project_name}"
     TYPE CMAKE
     SOURCE_DIR "${source_dir}"
+    DEPS_GROUPS core blocks
     DEPENDS gnuradio4-blocks)
   list(APPEND GR4_MODULES "${project_name}")
 endforeach()
@@ -358,9 +413,15 @@ add_custom_target(sources DEPENDS ${source_targets})
 set(integration_test_targets "")
 if("gnuradio4-blocks" IN_LIST GR4_SELECTED_MODULES)
   set(smoke_binary_dir "${CMAKE_BINARY_DIR}/tests/oot-smoke")
+  # the installed SDK's package config resolves its own dependencies, so the
+  # consumer searches where they were installed as well as where GR4 was
+  set(smoke_prefix_path "${CMAKE_INSTALL_PREFIX}" "${GR4_DEPS_INSTALL_PREFIX}")
+  list(REMOVE_DUPLICATES smoke_prefix_path)
+  # escaped, so the joined path stays one argument when the command expands
+  list(JOIN smoke_prefix_path [[\;]] smoke_prefix_path_arg)
   set(smoke_cmake_args
-      "-DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}"
-      "-DCMAKE_PREFIX_PATH:PATH=${CMAKE_INSTALL_PREFIX}")
+      "-DCMAKE_PREFIX_PATH:STRING=${smoke_prefix_path_arg}"
+      "-DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}")
   foreach(variable CMAKE_C_COMPILER CMAKE_CXX_COMPILER CMAKE_TOOLCHAIN_FILE)
     if(DEFINED ${variable} AND NOT "${${variable}}" STREQUAL "")
       list(APPEND smoke_cmake_args "-D${variable}:FILEPATH=${${variable}}")
@@ -393,8 +454,8 @@ if("gnuradio4-control-plane" IN_LIST GR4_SELECTED_MODULES AND UNIX)
     COMMAND
       "${CMAKE_COMMAND}" -E env
       "GNURADIO4_PLUGIN_DIRECTORIES=${GR4_INSTALL_LIBDIR_FULL}/gnuradio-4/plugins:${GR4_INSTALL_LIBDIR_FULL}"
-      "LD_LIBRARY_PATH=${GR4_INSTALL_LIBDIR_FULL}"
-      "DYLD_LIBRARY_PATH=${GR4_INSTALL_LIBDIR_FULL}"
+      "LD_LIBRARY_PATH=${gr4_runtime_libdirs}"
+      "DYLD_LIBRARY_PATH=${gr4_runtime_libdirs}"
       /bin/sh "${CMAKE_SOURCE_DIR}/tests/control-plane-smoke.sh"
       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/gr4cp_server"
       "${CMAKE_COMMAND}"
@@ -408,8 +469,8 @@ set(check_commands "")
 set(check_environment
     "${CMAKE_COMMAND}" -E env
     "GNURADIO4_PLUGIN_DIRECTORIES=${GR4_INSTALL_LIBDIR_FULL}/gnuradio-4/plugins:${GR4_INSTALL_LIBDIR_FULL}"
-    "LD_LIBRARY_PATH=${GR4_INSTALL_LIBDIR_FULL}"
-    "DYLD_LIBRARY_PATH=${GR4_INSTALL_LIBDIR_FULL}")
+    "LD_LIBRARY_PATH=${gr4_runtime_libdirs}"
+    "DYLD_LIBRARY_PATH=${gr4_runtime_libdirs}")
 foreach(test_dir IN LISTS ctest_dirs)
   list(
     APPEND
@@ -442,5 +503,10 @@ configure_file(
 
 message(STATUS "GNU Radio 4 sources: ${GR4_SOURCE_ROOT}")
 message(STATUS "Shared install prefix: ${CMAKE_INSTALL_PREFIX}")
+if(GR4_BUILD_DEPS)
+  message(STATUS "Dependency prefix: ${GR4_DEPS_INSTALL_PREFIX}")
+else()
+  message(STATUS "Dependencies: provided by the machine (GR4_BUILD_DEPS is OFF)")
+endif()
 message(STATUS "Modules: ${GR4_SELECTED_MODULES}")
 message(STATUS "After building: source ${CMAKE_BINARY_DIR}/activate.sh")

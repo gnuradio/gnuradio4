@@ -1,8 +1,8 @@
 # Module configuration
 
 `modules.cmake` is the checked-in workspace manifest. It declares repositories,
-dependencies, build adapters, optional child-test integration, and membership
-in named module groups.
+dependencies, third-party dependency groups, build adapters, optional
+child-test integration, and membership in named module groups.
 `projects.local.cmake` is its ignored, machine-local extension.
 
 ## Select modules
@@ -46,10 +46,19 @@ gr4_register_module(
   OPTIONS_KEY RADIO_ASTRONOMY
   REPOSITORY https://github.com/example/gr4-radio-astronomy.git
   REF main
+  DEPS_GROUPS core blocks
   GROUPS full
   DEPENDS gnuradio4-blocks
   TESTS)
 ```
+
+`DEPS_GROUPS` names the third-party dependencies the module needs in the prefix
+before it configures, as groups of the [gr-deps](building.md#third-party-dependencies)
+superbuild: `core`, `blocks`, `control-plane`, and `studio`. It is not
+inherited along `DEPENDS`, because consuming a module is not the same as
+consuming what that module linked: a module declares what it includes itself.
+The superbuild builds the union over the selected modules, so a group costs
+nothing once another selected module already asked for it.
 
 The declaration creates build, download, clean, and aggregate integration and
 exposes repository/ref/CMake-argument cache variables. `TESTS` enables and
@@ -109,7 +118,7 @@ repository's package scripts rather than `CMAKE_ARGS`.
 | `GR4_CONTROL_PLANE_REPOSITORY`, `GR4_CONTROL_PLANE_REF` | GNU Radio, `main` | Control-plane clone source and revision |
 | `GR4_STUDIO_REPOSITORY`, `GR4_STUDIO_REF` | GNU Radio, `main` | Studio clone source and revision |
 | `GR4_BUILD_TESTING` | `ON` | Allow explicitly registered child-project tests |
-| `GR4_FETCH_DEPS` | `ON` | Allow selected dependency downloads |
+| `GR4_BUILD_DEPS` | `ON` | Build third-party dependencies from source; see the [build guide](building.md#third-party-dependencies) for the `GR4_DEPS_*` options it enables |
 | `GR4_WARNINGS_AS_ERRORS` | `ON` | Treat child warnings as errors |
 | `GR4_ADDRESS_SANITIZER` | `OFF` | Enable AddressSanitizer in children |
 | `GR4_UB_SANITIZER` | `OFF` | Enable UndefinedBehaviorSanitizer in children |

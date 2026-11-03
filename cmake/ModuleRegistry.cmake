@@ -19,7 +19,7 @@ function(gr4_register_module)
       REF
       SOURCE_KEY
       OPTIONS_KEY)
-  set(multi_value_args GROUPS DEPENDS OPTIONAL_DEPENDS CMAKE_ARGS)
+  set(multi_value_args GROUPS DEPS_GROUPS DEPENDS OPTIONAL_DEPENDS CMAKE_ARGS)
   cmake_parse_arguments(
     PARSE_ARGV 0 MODULE "${options}" "${one_value_args}" "${multi_value_args}")
 
@@ -68,6 +68,15 @@ function(gr4_register_module)
       OR MODULE_NAME IN_LIST MODULE_OPTIONAL_DEPENDS)
     message(FATAL_ERROR "Module '${MODULE_NAME}' cannot depend on itself")
   endif()
+  foreach(deps_group IN LISTS MODULE_DEPS_GROUPS)
+    if(NOT deps_group IN_LIST GR4_DEPS_KNOWN_GROUPS)
+      message(FATAL_ERROR
+        "Module '${MODULE_NAME}' requests unknown gr-deps group '${deps_group}'. "
+        "Known groups: ${GR4_DEPS_KNOWN_GROUPS}")
+    endif()
+  endforeach()
+  list(REMOVE_DUPLICATES MODULE_DEPS_GROUPS)
+
   if(MODULE_SOURCE_PROVIDER
       AND NOT MODULE_SOURCE_PROVIDER IN_LIST MODULE_DEPENDS)
     list(APPEND MODULE_DEPENDS "${MODULE_SOURCE_PROVIDER}")
@@ -137,6 +146,7 @@ function(gr4_register_module)
   _gr4_set_module_property("${MODULE_NAME}" CMAKE_ARGS_VARIABLE "${cmake_args_variable}")
   _gr4_set_module_property("${MODULE_NAME}" CMAKE_ARGS "${MODULE_CMAKE_ARGS}")
   _gr4_set_module_property("${MODULE_NAME}" GROUPS "${MODULE_GROUPS}")
+  _gr4_set_module_property("${MODULE_NAME}" DEPS_GROUPS "${MODULE_DEPS_GROUPS}")
   _gr4_set_module_property("${MODULE_NAME}" DEPENDS "${MODULE_DEPENDS}")
   _gr4_set_module_property(
     "${MODULE_NAME}" OPTIONAL_DEPENDS "${MODULE_OPTIONAL_DEPENDS}")
@@ -263,6 +273,18 @@ endfunction()
 
 function(gr4_realize_modules)
   gr4_select_modules(selected_modules)
+
+  # The dependency superbuild has to exist as a target before the modules that
+  # will depend on it, and it only builds what the selection actually needs.
+  if(GR4_BUILD_DEPS)
+    set(deps_groups "")
+    foreach(name IN LISTS selected_modules)
+      _gr4_get_module_property(module_deps_groups "${name}" DEPS_GROUPS)
+      list(APPEND deps_groups ${module_deps_groups})
+    endforeach()
+    list(REMOVE_DUPLICATES deps_groups)
+    gr4_add_deps_project(GROUPS ${deps_groups})
+  endif()
 
   foreach(name IN LISTS selected_modules)
     _gr4_get_module_property(module_type "${name}" TYPE)

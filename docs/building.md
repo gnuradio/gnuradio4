@@ -14,9 +14,53 @@ The core stack uses C++23 and requires:
   recommended)
 
 The full workspace additionally requires Node.js 22 and npm. Individual
-modules can require further system packages. Development presets allow the
-child projects to fetch selected dependencies; the `offline` profile uses only
+modules can require further system packages. Third-party dependencies are built
+from source by default, as described below; the `offline` profile uses only
 system dependencies.
+
+## Third-party dependencies
+
+The modules do not build their own dependencies. A second superbuild,
+[gr-deps](https://github.com/johnwparent/gnuradio4-superbuild), builds
+vir-simd, boost.ut, cpp-httplib, SoapySDR, Boost, zlib and the rest into the
+prefix before any module configures, so that one toolchain and, on Windows, one
+MSVC runtime are used throughout. It is driven from here as the `gr-deps`
+project: missing sources are cloned into `src/gr-deps` on the first build, and
+an existing checkout is left alone exactly as a module's is.
+
+Which dependencies are built follows the module selection. Each module declares
+the gr-deps groups it consumes with `DEPS_GROUPS` in `modules.cmake`, and the
+union over the selected modules decides what gr-deps is asked for, so a `base`
+workspace never builds the control plane's Boost. Changing the selection
+rebuilds only what the new groups add.
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `GR4_BUILD_DEPS` | `ON` | `OFF` uses dependencies already on the machine and creates no `gr-deps` project |
+| `GR4_DEPS_INSTALL_PREFIX` | `CMAKE_INSTALL_PREFIX` | Where the dependencies install; a separate prefix is added to every module's search path |
+| `GR4_DEPS_SOURCE_DIR` | `src/gr-deps` | An existing gr-deps checkout to build instead |
+| `GR4_DEPS_REPOSITORY`, `GR4_DEPS_REF` | the gr-deps repository above, `main` | What is cloned when no checkout exists |
+| `GR4_DEPS_BUILD_TYPE` | follows `CMAKE_BUILD_TYPE` | Build type for the dependencies; a build type they do not know, such as `RelWithAssert`, becomes `Release` |
+| `GR4_DEPS_CMAKE_ARGS` | empty | Extra arguments for gr-deps itself, such as `-DENABLE_TBB=ON` |
+
+`GR4_BUILD_TESTING` reaches the dependencies as well, as gr-deps'
+`TARGET_TESTS`: a build with tests off does not build boost.ut or GoogleTest,
+which nothing but the child test suites uses. The install layout and the
+toolchain are forwarded to each dependency build too, so a dependency lands in
+the same `lib/` and `bin/` as the modules rather than wherever `GNUInstallDirs`
+would put it on the distribution in use.
+
+Build or discard them on their own:
+
+```sh
+cmake --build --preset dev --target gr-deps
+cmake --build --preset dev --target gr-deps-clean
+```
+
+A prefix built elsewhere, such as one restored from the gr-deps CI cache, is
+used by configuring with `-DGR4_BUILD_DEPS=OFF
+-DGR4_DEPS_INSTALL_PREFIX=/path/to/prefix`: nothing is built, and the prefix is
+still searched by every module.
 
 ## Standard profiles
 
@@ -35,7 +79,7 @@ source build/dev/activate.sh
 | `release` | Release, no tests | Performance and install validation | `install/release/` |
 | `asan` | Debug, tests, AddressSanitizer | Memory-error diagnostics | `install/asan/` |
 | `ubsan` | Debug, tests, UndefinedBehaviorSanitizer | Undefined-behavior diagnostics | `install/ubsan/` |
-| `offline` | RelWithAssert, tests, system dependencies | No dependency downloads | `install/offline/` |
+| `offline` | RelWithAssert, tests, system dependencies | Dependencies already on the machine, none built | `install/offline/` |
 | `ci` | RelWithAssert, tests, warnings as errors | Base-stack integration CI | `install/ci/` |
 | `full` | RelWithAssert, tests, incubator, control-plane, Studio | Complete application development | `install/full/` |
 | `full-ci` | RelWithAssert, tests, incubator, control-plane, Studio | Complete integration CI | `install/full-ci/` |
@@ -83,7 +127,9 @@ cmake --build --preset dev --target sources
 ```
 
 Use `full` instead of `dev` to include incubator, control-plane, and Studio.
-Remove one child's build state without deleting its source or shared prefix:
+Remove one child's build state without deleting its source or shared prefix
+(`gr-deps-clean` does the same for the dependency superbuild, leaving the
+dependencies it already installed in place):
 
 ```sh
 cmake --build --preset dev --target gnuradio4-blocks-clean
