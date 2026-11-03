@@ -210,6 +210,18 @@ function(gr4_add_deps_project)
   endforeach()
   list(JOIN forwarded_args "|" forwarded_args_value)
 
+  # The rewrite applies to every CMAKE_ARGS entry, GR4_DEPS_CMAKE_ARGS included,
+  # so a "|" supplied there would be split into a separate argument just as
+  # silently.
+  foreach(argument IN LISTS GR4_DEPS_CMAKE_ARGS)
+    string(FIND "${argument}" "|" separator_position)
+    if(NOT separator_position EQUAL -1)
+      message(FATAL_ERROR
+        "GR4_DEPS_CMAKE_ARGS entry '${argument}' cannot be passed to ${name}: it "
+        "contains the separator the arguments are carried with")
+    endif()
+  endforeach()
+
   set(cmake_args
       "-DCMAKE_INSTALL_PREFIX:PATH=${GR4_DEPS_INSTALL_PREFIX}"
       "-DGR_DEPS_INSTALL_PREFIX:PATH=${GR4_DEPS_INSTALL_PREFIX}"

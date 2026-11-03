@@ -308,9 +308,15 @@ function(gr4_add_node_project name)
   endif()
   set(node_prefix_path "${CMAKE_INSTALL_PREFIX}")
   set(node_bin_dirs "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}")
+  set(node_pkg_config_path
+      "${GR4_INSTALL_LIBDIR_FULL}/pkgconfig${node_separator}${CMAKE_INSTALL_PREFIX}/share/pkgconfig")
   if(NOT GR4_DEPS_INSTALL_PREFIX STREQUAL CMAKE_INSTALL_PREFIX)
     string(APPEND node_prefix_path "${node_separator}${GR4_DEPS_INSTALL_PREFIX}")
     list(APPEND node_bin_dirs "${GR4_DEPS_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}")
+    string(
+      APPEND node_pkg_config_path
+      "${node_separator}${GR4_DEPS_LIBDIR_FULL}/pkgconfig"
+      "${node_separator}${GR4_DEPS_INSTALL_PREFIX}/share/pkgconfig")
   endif()
 
   # PATH is prepended a directory at a time instead of rebuilt around
@@ -330,7 +336,7 @@ function(gr4_add_node_project name)
       "GR4_PREFIX=${CMAKE_INSTALL_PREFIX}"
       "GR4_PREFIX_PATH=${node_prefix_path}"
       "CMAKE_PREFIX_PATH=${node_prefix_path}"
-      "PKG_CONFIG_PATH=${GR4_INSTALL_LIBDIR_FULL}/pkgconfig${node_separator}${CMAKE_INSTALL_PREFIX}/share/pkgconfig")
+      "PKG_CONFIG_PATH=${node_pkg_config_path}")
 
   ExternalProject_Add(
     "${name}"
