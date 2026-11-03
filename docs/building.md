@@ -21,7 +21,7 @@ system dependencies.
 ## Third-party dependencies
 
 The modules do not build their own dependencies. A second superbuild,
-[gr-deps](https://github.com/johnwparent/gnuradio4-superbuild), builds
+[gr-deps](https://github.com/gnuradio/gnuradio-deps), builds
 vir-simd, boost.ut, cpp-httplib, SoapySDR, Boost, zlib and the rest into the
 prefix before any module configures, so that one toolchain and, on Windows, one
 MSVC runtime are used throughout. It is driven from here as the `gr-deps`

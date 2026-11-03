@@ -29,7 +29,7 @@ set(GR4_DEPS_SOURCE_DIR
     ""
     CACHE PATH "Existing gr-deps source tree to build instead of the one below GR4_SOURCE_ROOT")
 set(GR4_DEPS_REPOSITORY
-    "https://github.com/johnwparent/gnuradio4-superbuild.git"
+    "https://github.com/gnuradio/gnuradio-deps.git"
     CACHE STRING "Git repository used when gr-deps is missing")
 set(GR4_DEPS_REF
     "main"
