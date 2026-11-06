@@ -155,6 +155,7 @@ function(gr4_add_project name)
       "-DCMAKE_PREFIX_PATH:STRING=${prefix_path_arg}"
       "-DCMAKE_PROGRAM_PATH:PATH=${CMAKE_INSTALL_PREFIX}/bin"
       "-DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}"
+      "-DCMAKE_USER_MAKE_RULES_OVERRIDE:FILEPATH=${CMAKE_SOURCE_DIR}/cmake/BuildTypeDefaults.cmake"
       "-DBUILD_SHARED_LIBS:BOOL=${BUILD_SHARED_LIBS}"
       "-DENABLE_TESTING:BOOL=${child_testing}"
       "-DPKG_CONFIG_USE_CMAKE_PREFIX_PATH:BOOL=ON"
@@ -208,9 +209,14 @@ function(gr4_add_project name)
     USES_TERMINAL_BUILD TRUE
     USES_TERMINAL_INSTALL TRUE)
 
+  # Keep configure-generated metadata in STAMP_DIR. Invalidating mkdir and
+  # configure recreates the binary directory and its cache on the next build.
   add_custom_target(
     "${name}-clean"
-    COMMAND "${CMAKE_COMMAND}" -E rm -rf "${project_binary_dir}" "${project_stamp_dir}"
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf
+      "${project_binary_dir}"
+      "${project_stamp_dir}/${name}-mkdir"
+      "${project_stamp_dir}/${name}-configure"
     COMMENT "Removing ${name}'s build state")
 
   set_property(GLOBAL APPEND PROPERTY GR4_PROJECT_TARGETS "${name}")
@@ -304,7 +310,10 @@ function(gr4_add_node_project name)
 
   add_custom_target(
     "${name}-clean"
-    COMMAND "${CMAKE_COMMAND}" -E rm -rf "${node_stamp_dir}"
+    COMMAND "${CMAKE_COMMAND}" -E rm -f
+      "${node_stamp_dir}/${name}-mkdir"
+      "${node_stamp_dir}/${name}-configure"
+      "${node_stamp_dir}/node-dependencies.sha256"
     COMMENT "Removing ${name}'s superbuild state")
 
   set_property(GLOBAL APPEND PROPERTY GR4_PROJECT_TARGETS "${name}")
@@ -369,6 +378,7 @@ if("gnuradio4-blocks" IN_LIST GR4_SELECTED_MODULES)
   set(smoke_binary_dir "${CMAKE_BINARY_DIR}/tests/oot-smoke")
   set(smoke_cmake_args
       "-DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}"
+      "-DCMAKE_USER_MAKE_RULES_OVERRIDE:FILEPATH=${CMAKE_SOURCE_DIR}/cmake/BuildTypeDefaults.cmake"
       "-DCMAKE_PREFIX_PATH:PATH=${CMAKE_INSTALL_PREFIX}")
   foreach(variable CMAKE_C_COMPILER CMAKE_CXX_COMPILER CMAKE_TOOLCHAIN_FILE)
     if(DEFINED ${variable} AND NOT "${${variable}}" STREQUAL "")
