@@ -40,6 +40,16 @@ source build/dev/activate.sh
 | `full` | RelWithAssert, tests, ZeroMQ/SDR/Audio blocks, control-plane, Studio | Complete application development | `install/full/` |
 | `full-ci` | RelWithAssert, tests, ZeroMQ/SDR/Audio blocks, control-plane, Studio | Complete integration CI | `install/full-ci/` |
 
+`RelWithAssert` is a custom configuration. The workspace initializes it in every
+CMake child with optimization and assertions enabled (`-O2 -DASSERT_ENABLED`
+with GCC/Clang, `/O2 /GL /DASSERT_ENABLED` with MSVC). Explicit child cache flags
+take precedence. Some tests and benchmarks select their own optimization level.
+`full` selects the complete module set; it retains this development configuration.
+
+Build directories configured before these shared defaults were added may have
+empty cached `CMAKE_CXX_FLAGS_RELWITHASSERT` values. Use a fresh build directory
+when rebuilding with `RelWithAssert`.
+
 Discover the profiles available in the current checkout:
 
 ```sh
