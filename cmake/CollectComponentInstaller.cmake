@@ -59,6 +59,10 @@ set(GR4_COMPONENT_VERSION [==[@CPACK_PACKAGE_VERSION@]==])
 set(GR4_COMPONENT_SUMMARY [==[@summary@]==])
 set(GR4_COMPONENT_INSTALLER [==[@NAME@.exe]==])
 set(GR4_COMPONENT_CPACK_COMPONENTS [==[@CPACK_COMPONENTS_ALL@]==])
+# "name=version" entries, '|' separated: what this module calls itself in the
+# shared install manifest, which is not CPACK_PACKAGE_NAME. Set by gr-core's
+# gr_configure_innosetup_installer(); empty for a module that does not use it.
+set(GR4_COMPONENT_MANIFEST_PACKAGES [==[@CPACK_GR4_MANIFEST_PACKAGES@]==])
 ]=]
   @ONLY)
 

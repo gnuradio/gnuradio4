@@ -36,12 +36,20 @@ if(GR_PLUGIN_API_VERSION STREQUAL "")
   message(FATAL_ERROR "${gnuradio4_config} does not set GR_PLUGIN_API_VERSION")
 endif()
 
+# The bundle creates no uninstall entry of its own, but its AppId still keys
+# the state Inno Setup keeps for "this is already installed", so it follows the
+# same ABI rule as the module installers: one product per plugin ABI.
+set(BUNDLE_APP_ID "${BUNDLE_APP_ID}_v${GR_PLUGIN_API_VERSION}")
+
 # The shared install flow, configured without packages of its own: the bundle
 # only records the install root, each module installer registers itself.
 set(template_dir "${GNURADIO4_CMAKE_DIR}/packaging/innosetup")
 set(GR_INSTALLER_COMPONENT_PACKAGES "")
 set(GR_INSTALLER_PLUGIN_PACKAGES "")
 set(GR_INSTALLER_PRESELECTED_COMPONENTS "")
+# The bundle registers no packages of its own, so it records no configuration
+# either; the constant still has to be defined for the template.
+set(GR_INSTALLER_CONFIGURATION "")
 file(TO_NATIVE_PATH "${template_dir}/gr_manifest.ps1" GR_MANIFEST_TOOL)
 configure_file("${template_dir}/gr_install_flow.iss.in" "${PACKAGING_DIR}/gr_install_flow.iss" @ONLY)
 configure_file("${template_dir}/gr_installer_files.iss.in" "${PACKAGING_DIR}/gr_installer_files.iss" @ONLY)
@@ -82,7 +90,21 @@ foreach(name IN LISTS modules)
   unset(GR4_COMPONENT_SUMMARY)
   unset(GR4_COMPONENT_INSTALLER)
   unset(GR4_COMPONENT_CPACK_COMPONENTS)
+  unset(GR4_COMPONENT_MANIFEST_PACKAGES)
   include("${fragment}")
+
+  # "gr-core=4.0.0|gr-foo=4.0.0" -> "gr-core,gr-foo". The installer script asks
+  # the manifest about these names to find out whether a debug build of this
+  # module is already on the machine.
+  set(manifest_packages "")
+  string(REPLACE "|" ";" manifest_entries "${GR4_COMPONENT_MANIFEST_PACKAGES}")
+  foreach(manifest_entry IN LISTS manifest_entries)
+    string(REGEX REPLACE "=.*$" "" manifest_entry "${manifest_entry}")
+    if(NOT manifest_entry STREQUAL "")
+      list(APPEND manifest_packages "${manifest_entry}")
+    endif()
+  endforeach()
+  list(JOIN manifest_packages "," manifest_packages)
 
   string(MAKE_C_IDENTIFIER "${name}" id)
   set(description "${GR4_COMPONENT_SUMMARY} ${GR4_COMPONENT_VERSION}")
@@ -155,6 +177,7 @@ foreach(name IN LISTS modules)
     "  Gr4Entries[${entry_count}].DebugInstaller := '${debug_installer}';\n"
     "  Gr4Entries[${entry_count}].Description := '${pascal_description}';\n"
     "  Gr4Entries[${entry_count}].Components := '${base_components}';\n"
+    "  Gr4Entries[${entry_count}].Packages := '${manifest_packages}';\n"
     "  Gr4Entries[${entry_count}].HasDevelop := ${has_develop};\n"
     "  Gr4Entries[${entry_count}].HasSymbols := ${has_symbols};\n")
   math(EXPR entry_count "${entry_count} + 1")

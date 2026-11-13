@@ -51,11 +51,14 @@ Source: "gr4-shell.cmd"; DestDir: "{app}"; Flags: ignoreversion
 Source: "gr4-dev-shell.cmd"; DestDir: "{app}"; Flags: ignoreversion
 @GR4_BUNDLE_ICON_FILES@@GR4_BUNDLE_FILES@
 [Icons]
-; the plain shell is GR 4 only; the developer one also enters the Visual
-; Studio environment, so one prompt has cl.exe, ninja and GR 4
-Name: "{autoprograms}\GNURadio 4.0\GNU Radio 4 Shell"; Filename: "{app}\gr4-shell.cmd"; WorkingDir: "{app}"@GR4_BUNDLE_SHORTCUT_ICON@
-Name: "{autoprograms}\GNURadio 4.0\GNU Radio 4 Developer Shell"; Filename: "{app}\gr4-dev-shell.cmd"; WorkingDir: "{app}"@GR4_BUNDLE_SHORTCUT_ICON@
-Name: "{autodesktop}\GNU Radio 4 Shell"; Filename: "{app}\gr4-shell.cmd"; WorkingDir: "{app}"; Tasks: desktopicon@GR4_BUNDLE_SHORTCUT_ICON@
+; The plain shell is GR 4 only; the developer one also enters the Visual
+; Studio environment, so one prompt has cl.exe, ninja and GR 4. The names come
+; from gr-core's shared flow, which carries the plugin ABI version in them and
+; is also what removes these shortcuts on the last uninstall, so the two
+; cannot disagree about what they are called.
+Name: "{autoprograms}\{code:GrBundleStartMenuLeaf}\GNU Radio 4 Shell"; Filename: "{app}\gr4-shell.cmd"; WorkingDir: "{app}"@GR4_BUNDLE_SHORTCUT_ICON@
+Name: "{autoprograms}\{code:GrBundleStartMenuLeaf}\GNU Radio 4 Developer Shell"; Filename: "{app}\gr4-dev-shell.cmd"; WorkingDir: "{app}"@GR4_BUNDLE_SHORTCUT_ICON@
+Name: "{autodesktop}\GNU Radio 4 Shell{code:GrBundleSuffix}"; Filename: "{app}\gr4-shell.cmd"; WorkingDir: "{app}"; Tasks: desktopicon@GR4_BUNDLE_SHORTCUT_ICON@
 
 [Code]
 #include "@GR4_INSTALL_FLOW_ISS@"
@@ -70,6 +73,9 @@ type
     Description: String;
     { the module's CPack components other than DEVELOP and SYMBOLS, comma-separated }
     Components: String;
+    { what the module calls itself in the shared manifest, comma-separated,
+      which is how we ask whether its debug build is already installed }
+    Packages: String;
     HasDevelop: Boolean;
     HasSymbols: Boolean;
   end;
@@ -77,6 +83,7 @@ type
 var
   Gr4Entries: array of TGr4Entry;
   Gr4ModePage: TInputOptionWizardPage;
+  Gr4DebugPreselected: Boolean;
 
 const
   Gr4TypicalComponents = '@GR4_BUNDLE_TYPICAL_COMPONENTS@';
@@ -90,9 +97,119 @@ begin
   Result := (Gr4ModePage <> nil) and Gr4ModePage.Values[0];
 end;
 
+procedure Gr4AppendTo(var List: String; const Item: String);
+begin
+  if Item = '' then
+    Exit;
+  if List <> '' then
+    List := List + ',';
+  List := List + Item;
+end;
+
+{ True when the manifest records a Debug build of any of this module's
+  packages, whichever installer put it there. }
+function Gr4DebugIsInstalled(Index: Integer): Boolean;
+var
+  Packages: TArrayOfString;
+  Position: Integer;
+begin
+  Result := False;
+  Packages := GrSplit(Gr4Entries[Index].Packages, ',');
+  for Position := 0 to GetArrayLength(Packages) - 1 do
+    if GrConfigurationIsInstalled('component', Trim(Packages[Position]), 'Debug') then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
+function Gr4ListContains(const List, Item: String): Boolean;
+var
+  Entries: TArrayOfString;
+  Position: Integer;
+begin
+  Result := False;
+  Entries := GrSplit(List, ',');
+  for Position := 0 to GetArrayLength(Entries) - 1 do
+    if CompareText(Trim(Entries[Position]), Item) = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
+{ The debug components of the modules whose debug build is already on this
+  machine, so that re-running the bundle upgrades them alongside the release
+  build instead of leaving them behind at the old version.
+
+  Only for the modules the given selection already installs. A debug build
+  shares its module's install root, uninstall entry and manifest entry with
+  the release build, so installing one without the other would leave the
+  module at two versions at once, with the manifest recording whichever ran
+  last. A module that is not being installed is left alone entirely. }
+function Gr4InstalledDebugComponents(const Selection: String): String;
+var
+  Index: Integer;
+begin
+  Result := '';
+  for Index := 0 to GetArrayLength(Gr4Entries) - 1 do
+    if (Gr4Entries[Index].DebugInstaller <> '') and
+       Gr4ListContains(Selection, Gr4Entries[Index].Id) and
+       Gr4DebugIsInstalled(Index) then
+      Gr4AppendTo(Result, Gr4Entries[Index].Id + '\debug');
+end;
+
+{ Ticks those same boxes the first time the components page is shown.
+  WizardSelectComponents replaces the selection rather than adding to it, so
+  whatever the page already has ticked has to be carried over by hand. }
+procedure Gr4PreselectInstalledDebug();
+var
+  Index: Integer;
+  Selection: String;
+  Extra: Boolean;
+begin
+  if Gr4DebugPreselected then
+    Exit;
+  Gr4DebugPreselected := True;
+
+  Extra := False;
+  Selection := '';
+  for Index := 0 to GetArrayLength(Gr4Entries) - 1 do
+  begin
+    { everything below hangs off the module itself: a child whose parent is
+      not selected must not be carried over, and the wizard cannot have one
+      ticked anyway }
+    if WizardIsComponentSelected(Gr4Entries[Index].Id) then
+    begin
+      Gr4AppendTo(Selection, Gr4Entries[Index].Id);
+      if Gr4Entries[Index].HasDevelop and WizardIsComponentSelected(Gr4Entries[Index].Id + '\develop') then
+        Gr4AppendTo(Selection, Gr4Entries[Index].Id + '\develop');
+      if Gr4Entries[Index].HasSymbols and WizardIsComponentSelected(Gr4Entries[Index].Id + '\symbols') then
+        Gr4AppendTo(Selection, Gr4Entries[Index].Id + '\symbols');
+      if Gr4Entries[Index].DebugInstaller <> '' then
+      begin
+        if WizardIsComponentSelected(Gr4Entries[Index].Id + '\debug') then
+          Gr4AppendTo(Selection, Gr4Entries[Index].Id + '\debug')
+        else if Gr4DebugIsInstalled(Index) then
+        begin
+          Gr4AppendTo(Selection, Gr4Entries[Index].Id + '\debug');
+          Extra := True;
+        end;
+      end;
+    end;
+  end;
+
+  { nothing to add: leave the page exactly as Inno Setup set it up }
+  if Extra then
+    WizardSelectComponents(Selection);
+end;
+
 <event('InitializeWizard')>
 procedure Gr4InitializeWizard();
 begin
+  { the components page asks these about the manifest, long before any
+    installer runs, so the table cannot wait until install time }
+  Gr4InitEntries();
   Gr4ModePage := CreateInputOptionPage(wpWelcome, 'Setup mode', 'How much do you want to decide?',
     'Easy installation uses the recommended set of components. Custom installation lets you choose'
     + ' each one, including development files, debug symbols and debug builds.', True, False);
@@ -111,29 +228,36 @@ end;
 
 <event('CurPageChanged')>
 procedure Gr4CurPageChanged(CurPageID: Integer);
+var
+  Selection, Debug: String;
 begin
   if (Gr4ModePage <> nil) and (CurPageID = Gr4ModePage.ID) then
     Exit;
-  { applied on the way past the mode page, so the ready page lists the truth }
+  if CurPageID = wpSelectComponents then
+    Gr4PreselectInstalledDebug();
+  { applied on the way past the mode page, so the ready page lists the truth.
+    A debug build already on the machine is kept even here: easy mode chooses
+    what to add, not what to silently drop. }
   if Gr4IsEasyMode() and (CurPageID = wpReady) then
-    WizardSelectComponents(Gr4TypicalComponents);
+  begin
+    Selection := Gr4TypicalComponents;
+    Debug := Gr4InstalledDebugComponents(Selection);
+    Gr4AppendTo(Selection, Debug);
+    WizardSelectComponents(Selection);
+  end;
 end;
 
+{ The components to pass to one of this module's installers. Both the release
+  and the debug installer get this same answer: the development files and the
+  debug symbols are wanted from whichever configurations are being installed,
+  and the checkboxes that choose them are per module, not per configuration. }
 function Gr4ComponentsArgument(Index: Integer): String;
 begin
   Result := Gr4Entries[Index].Components;
   if Gr4Entries[Index].HasDevelop and WizardIsComponentSelected(Gr4Entries[Index].Id + '\develop') then
-  begin
-    if Result <> '' then
-      Result := Result + ',';
-    Result := Result + 'DEVELOP';
-  end;
+    Gr4AppendTo(Result, 'DEVELOP');
   if Gr4Entries[Index].HasSymbols and WizardIsComponentSelected(Gr4Entries[Index].Id + '\symbols') then
-  begin
-    if Result <> '' then
-      Result := Result + ',';
-    Result := Result + 'SYMBOLS';
-  end;
+    Gr4AppendTo(Result, 'SYMBOLS');
 end;
 
 { Returns '' on success, or a line describing what went wrong. }
@@ -168,8 +292,6 @@ var
   Index, Steps, Done: Integer;
   Failure, Failures: String;
 begin
-  Gr4InitEntries();
-
   { Module installers refuse /DIR once a manifest exists, so they are not told
     where to install: recording the chosen root first makes each of them read
     it from the manifest instead. }
@@ -216,7 +338,9 @@ begin
     begin
       WizardForm.StatusLabel.Caption := Format('Installing %s (debug)...', [Gr4Entries[Index].Description]);
       WizardForm.FilenameLabel.Caption := Gr4Entries[Index].DebugInstaller;
-      Failure := Gr4RunInstaller(Gr4Entries[Index].DebugInstaller, '',
+      { the same component selection as the release run: without it the child
+        falls back to its own default set, which is not what was chosen here }
+      Failure := Gr4RunInstaller(Gr4Entries[Index].DebugInstaller, Gr4ComponentsArgument(Index),
         Gr4Entries[Index].Name + '-debug', Gr4Entries[Index].Name + ' (debug)');
       if Failure <> '' then
         Failures := Failures + GrEol + Failure;
