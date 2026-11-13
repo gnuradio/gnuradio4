@@ -106,8 +106,8 @@ repository's package scripts rather than `CMAKE_ARGS`.
 | `GR4_INCUBATOR_REPOSITORY`, `GR4_INCUBATOR_REF` | GNU Radio, `main` | Incubator clone source and revision |
 | `GR4_CONTROL_PLANE_REPOSITORY`, `GR4_CONTROL_PLANE_REF` | GNU Radio, `main` | Control-plane clone source and revision |
 | `GR4_STUDIO_REPOSITORY`, `GR4_STUDIO_REF` | GNU Radio, `main` | Studio clone source and revision |
-| `GR4_CORE_SOURCE_DIR`, `GR4_LIBRARY_SOURCE_DIR`, ... | empty | Existing checkout to build instead of the one below `GR4_SOURCE_ROOT` |
-| `GR4_CORE_BINARY_DIR`, `GR4_LIBRARY_BINARY_DIR`, ... | empty | Build tree to use instead of the one below the superbuild's binary directory |
+| `GR4_CORE_SOURCE_DIR`, `GR4_BLOCKS_SOURCE_DIR`, ... | empty | Existing checkout to build instead of the one below `GR4_SOURCE_ROOT` |
+| `GR4_CORE_BINARY_DIR`, `GR4_BLOCKS_BINARY_DIR`, ... | empty | Build tree to use instead of the one below the superbuild's binary directory |
 | `GR4_BUILD_TESTING` | `ON` | Allow explicitly registered child-project tests |
 | `GR4_FETCH_DEPS` | `ON` | Allow selected dependency downloads |
 | `GR4_WARNINGS_AS_ERRORS` | `ON` | Treat child warnings as errors |
