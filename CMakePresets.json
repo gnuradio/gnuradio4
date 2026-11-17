@@ -126,6 +126,7 @@
       "cacheVariables": {
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/debug-package",
         "GR_ENABLE_PACKAGING": "ON",
+        "GR4_MODULES": "gnuradio4-control-plane",
         "GR4_BUILD_TESTING": "OFF"
       }
     },
@@ -137,6 +138,7 @@
       "cacheVariables": {
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release-package",
         "GR_ENABLE_PACKAGING": "ON",
+        "GR4_MODULES": "gnuradio4-control-plane",
         "GR4_DEBUG_PACKAGING_DIR": "${sourceDir}/build/debug-package/packaging/components"
       }
     }

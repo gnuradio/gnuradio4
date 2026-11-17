@@ -36,9 +36,16 @@ read the same copy.
 | `gr4-installer` | builds every `<module>-package`, then composes the bundle |
 | `package` | alias for `gr4-installer` when nothing else defines it |
 
-A module that has no installer configuration is skipped with a status message
-rather than failing the build, which is how `gr4-incubator`,
-`gnuradio4-control-plane` and the studio modules stay out of the bundle.
+A module reaches the bundle only if it is both selected and able to build an
+installer. One that has no installer configuration is skipped with a status
+message rather than failing the build, which is how `gr4-incubator` and the
+studio modules stay out.
+
+Selection is the other half, and it is why the packaging presets name
+`gnuradio4-control-plane` in `GR4_MODULES`. `GR4_MODULE_GROUPS` defaults to
+`base`, which is core and blocks; the control plane is in the `applications`
+group, and selecting that whole group would pull in the studio modules as
+well.
 
 ## Options
 
