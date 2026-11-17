@@ -136,6 +136,11 @@ function(gr4_package_project name binary_dir)
   set_property(GLOBAL APPEND PROPERTY GR4_PACKAGE_TARGETS "${name}-package")
 endfunction()
 
+# Debug information roughly doubles what a packaging build writes to disc, and
+# the symbols component is the only thing that consumes it, so it is worth
+# being able to turn off for a test installer.
+option(GR4_PACKAGE_SYMBOLS "Build debug symbols for the installer's symbols component" ON)
+
 # CMake arguments every child needs when it is going to be packaged. Appended
 # by gr4_add_project; empty when packaging is off, so ordinary builds are
 # unaffected.
@@ -145,7 +150,7 @@ function(gr4_packaging_cmake_args output)
     # release and debug libraries share one bin/, so the debug ones need
     # distinct names: gnuradio-core.dll beside gnuradio-cored.dll
     list(APPEND arguments "-DCMAKE_DEBUG_POSTFIX:STRING=d")
-    if(gr4_msvc_toolchain)
+    if(gr4_msvc_toolchain AND GR4_PACKAGE_SYMBOLS)
       # an optimised build emits no PDB by default, which would leave the
       # symbols component with nothing to ship
       list(APPEND arguments
