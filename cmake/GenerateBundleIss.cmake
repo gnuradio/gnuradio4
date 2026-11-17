@@ -10,6 +10,11 @@
 # installed GR 4 installer templates do not exist until the modules are built.
 # MODULES is the configure-time selection in install order; installers left in
 # PACKAGING_DIR by an earlier, different selection are ignored.
+#
+# Script mode starts with every policy OLD unless the script asks otherwise, and
+# IN_LIST below is a parse error under CMP0057 OLD, so the version floor is not
+# decoration: without it this script's behaviour depends on which cmake runs it.
+cmake_minimum_required(VERSION 3.25)
 
 foreach(variable PACKAGING_DIR GNURADIO4_CMAKE_DIR MODULES BUNDLE_VERSION BUNDLE_APP_ID OUTPUT_DIR SCRIPT_DIR
                  TEMPLATE)
