@@ -40,7 +40,12 @@ $gr4LibDir = Join-Path $gr4Prefix 'lib'
 $gr4ApiVersion = '@GR_PLUGIN_API_VERSION@'
 
 $env:GR4_PREFIX = $gr4Prefix
-$env:PATH = (Join-Path $gr4Prefix 'bin') + ';' + $env:PATH
+# The plugin directory goes on PATH as well as bin. The block libraries live
+# there, and a program that LINKS one rather than loading it through the plugin
+# loader needs Windows to resolve the DLL through the loader search path. The
+# plugin loader itself uses absolute paths and does not need this.
+$gr4PluginLibDir = Join-Path $gr4LibDir 'gnuradio-4\plugins'
+$env:PATH = (Join-Path $gr4Prefix 'bin') + ';' + $gr4PluginLibDir + ';' + $env:PATH
 $env:CMAKE_PREFIX_PATH = if ($env:CMAKE_PREFIX_PATH) { "$gr4Prefix;$($env:CMAKE_PREFIX_PATH)" } else { $gr4Prefix }
 
 $gr4PkgConfig = @((Join-Path $gr4LibDir 'pkgconfig'), (Join-Path $gr4Prefix 'share\pkgconfig'))
@@ -57,6 +62,7 @@ foreach ($base in @($env:LOCALAPPDATA, $env:ProgramData)) {
     $candidate = Join-Path $base ".gnuradio-4\plugins\v$gr4ApiVersion"
     if (Test-Path -LiteralPath $candidate) { $gr4PluginDirectories += $candidate }
 }
+$gr4PluginDirectories += $gr4PluginLibDir
 $gr4PluginDirectories += $gr4LibDir
 if ($env:GNURADIO4_PLUGIN_DIRECTORIES) { $gr4PluginDirectories += $env:GNURADIO4_PLUGIN_DIRECTORIES }
 $env:GNURADIO4_PLUGIN_DIRECTORIES = $gr4PluginDirectories -join ';'

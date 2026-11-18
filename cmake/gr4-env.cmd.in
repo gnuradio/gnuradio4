@@ -51,7 +51,13 @@ goto parse_args
 set "GR4_API_VERSION=@GR_PLUGIN_API_VERSION@"
 set "GR4_LIBDIR=%GR4_PREFIX%\lib"
 
-set "GR4_NEW_PATH=%GR4_PREFIX%\bin;%PATH%"
+set "GR4_PLUGIN_LIBDIR=%GR4_LIBDIR%\gnuradio-4\plugins"
+rem The plugin directory goes on PATH as well as bin. The block libraries
+rem live there, and a program that LINKS one rather than loading it through
+rem the plugin loader needs Windows to resolve the DLL through the loader
+rem search path. The plugin loader itself uses absolute paths and does not
+rem need this.
+set "GR4_NEW_PATH=%GR4_PREFIX%\bin;%GR4_PLUGIN_LIBDIR%;%PATH%"
 if defined CMAKE_PREFIX_PATH (
     set "GR4_NEW_CMAKE_PREFIX_PATH=%GR4_PREFIX%;%CMAKE_PREFIX_PATH%"
 ) else (
@@ -77,9 +83,9 @@ for %%B in ("%LOCALAPPDATA%" "%ProgramData%") do (
     )
 )
 if defined GR4_NEW_PLUGIN_DIRS (
-    set "GR4_NEW_PLUGIN_DIRS=!GR4_NEW_PLUGIN_DIRS!;%GR4_LIBDIR%"
+    set "GR4_NEW_PLUGIN_DIRS=!GR4_NEW_PLUGIN_DIRS!;%GR4_PLUGIN_LIBDIR%;%GR4_LIBDIR%"
 ) else (
-    set "GR4_NEW_PLUGIN_DIRS=%GR4_LIBDIR%"
+    set "GR4_NEW_PLUGIN_DIRS=%GR4_PLUGIN_LIBDIR%;%GR4_LIBDIR%"
 )
 if defined GNURADIO4_PLUGIN_DIRECTORIES (
     set "GR4_NEW_PLUGIN_DIRS=!GR4_NEW_PLUGIN_DIRS!;%GNURADIO4_PLUGIN_DIRECTORIES%"
