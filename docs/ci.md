@@ -11,6 +11,10 @@ cmake --preset full-ci
 cmake --build --preset full-ci --target check
 ```
 
+The run starts by building the third-party dependencies with gr-deps, whose
+revision is overridden like any other repository, with `GR4_DEPS_REPOSITORY`
+and `GR4_DEPS_REF`.
+
 It exports `CMAKE_BUILD_PARALLEL_LEVEL=4`, limiting nested CMake builds. The
 component repositories retain ownership of unit and QA tests as well as broader
 compiler, platform, sanitizer, coverage, and WebAssembly matrices. The

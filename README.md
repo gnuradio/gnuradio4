@@ -67,9 +67,11 @@ docker run --rm -p 8080:8080 ghcr.io/gnuradio/gnuradio4-studio:latest
 
 Then visit <http://localhost:8080>.
 
-The initial build clones missing component repositories into `src/`. After a
-checkout exists, the superbuild leaves its Git state alone; you choose when to
-fetch, update, or switch its branch.
+The initial build clones missing component repositories, and the gr-deps
+dependency superbuild, into `src/`, then builds the third-party dependencies
+before the components themselves. After a checkout exists, the superbuild
+leaves its Git state alone; you choose when to fetch, update, or switch its
+branch.
 
 Each profile has its own build directory and install prefix; `dev` installs
 into `install/` and `full` into `install/full/`. Source the matching activation
@@ -123,6 +125,11 @@ the application, which also builds after control-plane when both are selected.
 At runtime, control-plane discovers installed block plugins, and Studio
 communicates with it through HTTP and WebSocket APIs. Studio can also connect
 to a remote control-plane service.
+
+Third-party dependencies sit below all of this. The modules do not build their
+own: the `gr-deps` superbuild builds what the selected modules declare into the
+shared prefix first, so every module compiles against one set. See
+[third-party dependencies](docs/building.md#third-party-dependencies).
 
 The superbuild coordinates the repositories it includes; OOTs remain
 independently owned and can be added to the workspace as described in the

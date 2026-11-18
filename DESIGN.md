@@ -23,6 +23,15 @@ The manifest's build ordering is more specific than that conceptual view:
 Every selected CMake component installs into the active profile's shared
 prefix, such as `install/` for `dev` or `install/full/` for `full`.
 
+The third-party dependencies are built ahead of all of it by a second
+superbuild, gr-deps, scheduled here as one more `ExternalProject` that every
+component depends on. Giving the dependencies their own superbuild keeps them
+out of the component repositories, which otherwise each pin and fetch their own
+copy of the same library: one tree, one toolchain, and on Windows one MSVC
+runtime for everything in the prefix. What it builds is derived from the module
+selection rather than fixed, so the dependency set follows the workspace
+instead of a profile having to restate it.
+
 This retains the package boundaries developers and CI encounter when each
 repository is built alone. It also lets each repository retain its own cache,
 options, generated files, and test tree.
