@@ -218,6 +218,26 @@ if(IS_DIRECTORY "${PACKAGING_DIR}/dependencies")
       "Source: \"dependencies\\*\"; DestDir: \"{app}\"; "
       "Flags: recursesubdirs createallsubdirs ignoreversion; "
       "Components: ${develop_condition}\n")
+
+    # The bundle has no uninstaller of its own, so it tells gr-core which
+    # files it placed and core removes them when the last module goes. A list
+    # rather than a rule in core: the payload is enumerated here and would go
+    # stale there, silently, the moment a package is added.
+    #
+    # Core deletes only the names in this list and never a directory by name,
+    # then prunes what is left empty. That is what keeps include/boost safe
+    # when a real Boost is installed beside Boost.UT.
+    set(bundle_file_list "${PACKAGING_DIR}/dependencies/share/gnuradio4/bundle-files.txt")
+    file(GLOB_RECURSE payload_files RELATIVE "${PACKAGING_DIR}/dependencies"
+         "${PACKAGING_DIR}/dependencies/*")
+    set(bundle_file_lines "")
+    foreach(payload_file IN LISTS payload_files)
+      # the list is removed by core after the files it names, so it stays out
+      if(NOT payload_file STREQUAL "share/gnuradio4/bundle-files.txt")
+        string(APPEND bundle_file_lines "${payload_file}\n")
+      endif()
+    endforeach()
+    file(WRITE "${bundle_file_list}" "${bundle_file_lines}")
   endif()
 endif()
 string(PREPEND entries_table "  SetArrayLength(Gr4Entries, ${entry_count});\n")
