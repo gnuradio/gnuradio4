@@ -14,9 +14,10 @@ The core stack uses C++23 and requires:
   recommended)
 
 The full workspace additionally requires Node.js 22 and npm. Individual
-modules can require further system packages. Development presets allow the
-child projects to fetch selected dependencies; the `offline` profile uses only
-system dependencies.
+modules can require further system packages. By default, the `gnuradio4-deps`
+module builds and installs selected third-party packages into the workspace
+prefix before core configures. The `offline` profile uses preinstalled
+packages.
 
 ## Standard profiles
 

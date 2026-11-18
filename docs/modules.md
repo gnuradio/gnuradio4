@@ -28,6 +28,7 @@ cmake --preset full -DGR4_MODULES=gr4-incubator
 ```
 
 Required dependencies are selected automatically. Excluding one is an error.
+When `GR4_FETCH_DEPS` is enabled, core requires `gnuradio4-deps`.
 The earlier `GR4_ENABLE_INCUBATOR`, `GR4_ENABLE_CONTROL_PLANE`, and
 `GR4_ENABLE_STUDIO` switches still include their module when set to `ON`; new
 profiles should use `GR4_EXCLUDE_MODULES` to disable modules.
@@ -96,18 +97,20 @@ repository's package scripts rather than `CMAKE_ARGS`.
 | `GR4_EXTRA_PROJECTS` | empty | Additional CMake project paths |
 | `GR4_EXTRA_CMAKE_ARGS` | empty | CMake arguments for every child project |
 | `GR4_BUILD_PARALLEL_LEVEL` | empty | Nested CMake job limit |
+| `GR4_DEPS_CMAKE_ARGS` | empty | Arguments for the `gnuradio4-deps` build |
 | `GR4_CORE_CMAKE_ARGS` | empty | Core-only CMake arguments |
 | `GR4_BLOCKS_CMAKE_ARGS` | empty | Blocks-only CMake arguments |
 | `GR4_INCUBATOR_CMAKE_ARGS` | empty | Incubator-only CMake arguments |
 | `GR4_CONTROL_PLANE_CMAKE_ARGS` | empty | Control-plane-only CMake arguments |
 | `GR4_STUDIO_BLOCKS_CMAKE_ARGS` | empty | Studio-blocks-only CMake arguments |
+| `GR4_DEPS_REPOSITORY`, `GR4_DEPS_REF` | GNU Radio, `main` | Dependency module clone source and revision |
 | `GR4_CORE_REPOSITORY`, `GR4_CORE_REF` | GNU Radio, `main` | Core clone source and revision |
 | `GR4_BLOCKS_REPOSITORY`, `GR4_BLOCKS_REF` | GNU Radio, `main` | Blocks clone source and revision |
 | `GR4_INCUBATOR_REPOSITORY`, `GR4_INCUBATOR_REF` | GNU Radio, `main` | Incubator clone source and revision |
 | `GR4_CONTROL_PLANE_REPOSITORY`, `GR4_CONTROL_PLANE_REF` | GNU Radio, `main` | Control-plane clone source and revision |
 | `GR4_STUDIO_REPOSITORY`, `GR4_STUDIO_REF` | GNU Radio, `main` | Studio clone source and revision |
 | `GR4_BUILD_TESTING` | `ON` | Allow explicitly registered child-project tests |
-| `GR4_FETCH_DEPS` | `ON` | Allow selected dependency downloads |
+| `GR4_FETCH_DEPS` | `ON` | Build selected third-party packages with `gnuradio4-deps` in the shared prefix. Set to `OFF` to use preinstalled packages. |
 | `GR4_WARNINGS_AS_ERRORS` | `ON` | Treat child warnings as errors |
 | `GR4_ADDRESS_SANITIZER` | `OFF` | Enable AddressSanitizer in children |
 | `GR4_UB_SANITIZER` | `OFF` | Enable UndefinedBehaviorSanitizer in children |
