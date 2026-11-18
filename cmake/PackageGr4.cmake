@@ -377,11 +377,38 @@ function(_gr4_add_windows_installer_target modules package_targets)
         "${GR4_PACKAGING_DIR}/gr4.ico")
   endif()
 
+  # Where the dependency headers were built. Searched in order, like
+  # find_package: a prefix given on the command line, one inherited from the
+  # environment, or the install prefix itself when the dependency build shared
+  # it. The environment matters as much as the cache here — a build pointed at
+  # its dependencies that way is ordinary, and reading only the cache variable
+  # would stage nothing at all without reporting anything wrong.
+  set(dependency_prefixes "${CMAKE_INSTALL_PREFIX}")
+  if(CMAKE_PREFIX_PATH)
+    list(APPEND dependency_prefixes ${CMAKE_PREFIX_PATH})
+  endif()
+  if(DEFINED ENV{CMAKE_PREFIX_PATH} AND NOT "$ENV{CMAKE_PREFIX_PATH}" STREQUAL "")
+    file(TO_CMAKE_PATH "$ENV{CMAKE_PREFIX_PATH}" environment_prefixes)
+    list(APPEND dependency_prefixes ${environment_prefixes})
+  endif()
+  list(REMOVE_DUPLICATES dependency_prefixes)
+  # a path may contain ';' only as a list separator, never literally, so '|'
+  # survives the trip through one -D argument
+  list(JOIN dependency_prefixes "|" dependency_prefixes_argument)
+
   # module names cannot contain ',' so it is a safe separator on any shell
   list(JOIN modules "," modules_argument)
   add_custom_target(
     gr4-installer
     ${icon_command}
+    # Staged before the script is generated, because the generator ships
+    # whatever is in the payload directory and has no way to make it appear.
+    COMMAND
+      "${CMAKE_COMMAND}"
+      "-DPREFIXES:STRING=${dependency_prefixes_argument}"
+      "-DLIBDIR:STRING=${CMAKE_INSTALL_LIBDIR}"
+      "-DOUT_DIR:PATH=${GR4_PACKAGING_DIR}/dependencies"
+      -P "${GR4_PACKAGING_SCRIPT_DIR}/StageDependencyPayload.cmake"
     COMMAND
       "${CMAKE_COMMAND}"
       "-DPACKAGING_DIR:PATH=${GR4_PACKAGING_DIR}"

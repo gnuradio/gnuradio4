@@ -152,6 +152,7 @@ foreach(name IN LISTS modules)
     list(APPEND typical_components "${id}")
   endif()
   if(has_develop)
+    list(APPEND develop_ids "${id}")
     string(APPEND components_section
       "Name: \"${id}\\develop\"; Description: \"Development files\"; Types: ${develop_types}\n")
     if("typical" IN_LIST GR4_MODULE_DEVELOP_TYPES_${id})
@@ -190,6 +191,34 @@ endforeach()
 
 if(entry_count EQUAL 0)
   message(FATAL_ERROR "No module installers were collected in ${PACKAGING_DIR}/components")
+endif()
+
+# The dependency payload: the packages gnuradio4Config.cmake find_dependency()s,
+# staged by StageDependencyPayload.cmake. It gets no component of its own and no
+# checkbox. Without these a consumer cannot get through find_package(gnuradio4),
+# so they are not a choice worth offering; they install exactly when some
+# module's development files do, and stay out of a runtime-only install, which
+# has no headers for them to complete.
+#
+# They are not GR's own files, so no module installer owns them and the bundle
+# writes them itself, the way it writes the launcher scripts and the icon.
+# gr-core's GrRemoveBundleExtras() removes bundle-owned files once the last
+# module goes, and has to account for these too.
+if(IS_DIRECTORY "${PACKAGING_DIR}/dependencies")
+  if(NOT develop_ids)
+    message(WARNING "A dependency payload was staged but no module ships development files")
+  else()
+    set(develop_conditions "")
+    foreach(develop_id IN LISTS develop_ids)
+      list(APPEND develop_conditions "${develop_id}\\develop")
+    endforeach()
+    # Inno reads Components: as a boolean expression over component names
+    list(JOIN develop_conditions " or " develop_condition)
+    string(APPEND files_section
+      "Source: \"dependencies\\*\"; DestDir: \"{app}\"; "
+      "Flags: recursesubdirs createallsubdirs ignoreversion; "
+      "Components: ${develop_condition}\n")
+  endif()
 endif()
 string(PREPEND entries_table "  SetArrayLength(Gr4Entries, ${entry_count});\n")
 list(JOIN typical_components "," GR4_BUNDLE_TYPICAL_COMPONENTS)
