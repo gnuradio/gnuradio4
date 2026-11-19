@@ -28,6 +28,26 @@ endforeach()
 string(REPLACE "|" ";" prefixes "${PREFIXES}")
 string(REPLACE "|" ";" licence_dirs "${LICENSE_DIRS}")
 
+# DEPS_PREFIX is the prefix the superbuild built the dependencies into. When it
+# is set it is the answer rather than a candidate: it is searched alone, and a
+# package missing from it is an error that names it.
+#
+# Searching a list that begins with GR's own install prefix is wrong in two
+# ways. That prefix is GR's output, and holds dependencies only when the
+# dependency build happened to share it, which is a default rather than a
+# fact. And a search cannot tell a package this build produced from one an
+# earlier run left behind, so a stale dependency is found and shipped with
+# nothing to say it is stale.
+#
+# The list stays for the build whose dependencies were not built here at all
+# and come from the system, Spack or vcpkg. Searching is the only option there.
+if(DEFINED DEPS_PREFIX AND NOT "${DEPS_PREFIX}" STREQUAL "")
+  set(prefixes "${DEPS_PREFIX}")
+  set(prefix_source "the dependency build's prefix")
+else()
+  set(prefix_source "the prefix search list")
+endif()
+
 # Enumerated, never globbed. Each entry is a package gnuradio4Config.cmake
 # names, so this list is checkable against that file rather than against
 # whatever happens to be sitting in a prefix.
@@ -46,8 +66,8 @@ set(payload_licence_ut "BSL-1.0")
 # security decision rather than a development one.
 
 # Finds one package along the prefix list, in order, the way find_package
-# searches. The prefix is not one place: it can be the dependency build's
-# output, a prefix shared with another checkout, or the GR install prefix.
+# searches. With DEPS_PREFIX set that list holds exactly one entry, so this
+# resolves to the dependency build's prefix or to nothing.
 function(stage_find_package package cmake_output prefix_output)
   foreach(prefix IN LISTS prefixes)
     if(IS_DIRECTORY "${prefix}/${LIBDIR}/cmake/${package}")
@@ -170,7 +190,7 @@ endforeach()
 
 if(missing)
   message(FATAL_ERROR
-    "dependency payload: ${missing} not found in any of ${prefixes}.\n"
+    "dependency payload: ${missing} not found in ${prefix_source}: ${prefixes}.\n"
     "These are required by the installed gnuradio4Config.cmake, so an installer "
     "without them cannot be configured against.")
 endif()

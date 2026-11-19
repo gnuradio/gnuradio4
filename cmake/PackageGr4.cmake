@@ -377,8 +377,20 @@ function(_gr4_add_windows_installer_target modules package_targets)
         "${GR4_PACKAGING_DIR}/gr4.ico")
   endif()
 
-  # Where the dependency headers were built. Searched in order, like
-  # find_package: a prefix given on the command line, one inherited from the
+  # Where the dependency headers came from. When the superbuild built them it
+  # knows that prefix exactly, so the answer is passed through rather than
+  # rediscovered; StageDependencyPayload.cmake says why a search is not a
+  # substitute for being told. GR4_BUILD_DEPS and GR4_DEPS_INSTALL_PREFIX
+  # belong to the dependency wiring, which owns where dependencies live. This
+  # consumes them, and stays inert when that wiring is absent or switched off.
+  set(dependency_prefix_argument "")
+  if(GR4_BUILD_DEPS AND NOT "${GR4_DEPS_INSTALL_PREFIX}" STREQUAL "")
+    set(dependency_prefix_argument
+        "-DDEPS_PREFIX:PATH=${GR4_DEPS_INSTALL_PREFIX}")
+  endif()
+
+  # The fallback, for dependencies this build did not produce. Searched in
+  # order, like find_package: a prefix given on the command line, one inherited from the
   # environment, or the install prefix itself when the dependency build shared
   # it. The environment matters as much as the cache here — a build pointed at
   # its dependencies that way is ordinary, and reading only the cache variable
@@ -405,6 +417,7 @@ function(_gr4_add_windows_installer_target modules package_targets)
     # whatever is in the payload directory and has no way to make it appear.
     COMMAND
       "${CMAKE_COMMAND}"
+      ${dependency_prefix_argument}
       "-DPREFIXES:STRING=${dependency_prefixes_argument}"
       "-DLIBDIR:STRING=${CMAKE_INSTALL_LIBDIR}"
       "-DOUT_DIR:PATH=${GR4_PACKAGING_DIR}/dependencies"
