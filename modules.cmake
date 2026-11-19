@@ -1,6 +1,27 @@
 # Ordered GNU Radio 4 module manifest. Dependencies must be declared before
 # consumers so the generated ExternalProject graph remains easy to inspect.
 
+set(gr4_core_dependencies "")
+if(GR4_FETCH_DEPS)
+  gr4_register_module(
+    NAME gnuradio4-deps
+    TYPE CMAKE
+    SOURCE_DIR gnuradio4-deps
+    SOURCE_KEY DEPS
+    OPTIONS_KEY DEPS
+    REPOSITORY https://github.com/gnuradio/gnuradio4-deps.git
+    REF main
+    CMAKE_ARGS
+      "-DTARGET_GR_CORE:BOOL=ON"
+      "-DTARGET_GR_BLOCKS:BOOL=$<TARGET_EXISTS:gnuradio4-blocks>"
+      "-DTARGET_GR_CONTROL_PLANE:BOOL=$<TARGET_EXISTS:gnuradio4-control-plane>"
+      "-DTARGET_GR_STUDIO:BOOL=$<TARGET_EXISTS:gnuradio4-studio-blocks>"
+      "-DTARGET_TESTS:BOOL=${GR4_BUILD_TESTING}"
+      # Core and blocks configure Boost.UT even with tests disabled.
+      "-DENABLE_BOOST_UT:BOOL=ON")
+  set(gr4_core_dependencies DEPENDS gnuradio4-deps)
+endif()
+
 gr4_register_module(
   NAME gnuradio4-core
   TYPE CMAKE
@@ -9,7 +30,8 @@ gr4_register_module(
   OPTIONS_KEY CORE
   REPOSITORY https://github.com/gnuradio/gnuradio4-core.git
   REF main
-  GROUPS base)
+  GROUPS base
+  ${gr4_core_dependencies})
 
 gr4_register_module(
   NAME gnuradio4-blocks

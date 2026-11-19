@@ -53,7 +53,7 @@ if(NOT gr4_effective_build_parallel_level STREQUAL ""
 endif()
 
 option(GR4_BUILD_TESTING "Build tests in the child projects" ON)
-option(GR4_FETCH_DEPS "Allow child projects to fetch missing dependencies" ON)
+option(GR4_FETCH_DEPS "Build and install third-party dependencies with gnuradio4-deps" ON)
 option(GR4_WARNINGS_AS_ERRORS "Build child projects with warnings as errors" ON)
 option(GR4_ADDRESS_SANITIZER "Build child projects with AddressSanitizer" OFF)
 option(GR4_UB_SANITIZER "Build child projects with UndefinedBehaviorSanitizer" OFF)
@@ -159,17 +159,38 @@ function(gr4_add_project name)
       "-DBUILD_SHARED_LIBS:BOOL=${BUILD_SHARED_LIBS}"
       "-DENABLE_TESTING:BOOL=${child_testing}"
       "-DPKG_CONFIG_USE_CMAKE_PREFIX_PATH:BOOL=ON"
-      "-DGR_USE_FETCHCONTENT_DEPS:BOOL=${GR4_FETCH_DEPS}"
+      "-DGR_USE_FETCHCONTENT_DEPS:BOOL=OFF"
       "-DWARNINGS_AS_ERRORS:BOOL=${GR4_WARNINGS_AS_ERRORS}"
       "-DADDRESS_SANITIZER:BOOL=${GR4_ADDRESS_SANITIZER}"
       "-DUB_SANITIZER:BOOL=${GR4_UB_SANITIZER}")
 
+  set(toolchain_args "")
   foreach(variable CMAKE_C_COMPILER CMAKE_CXX_COMPILER CMAKE_TOOLCHAIN_FILE)
     if(DEFINED ${variable} AND NOT "${${variable}}" STREQUAL "")
-      list(APPEND cmake_args "-D${variable}:FILEPATH=${${variable}}")
+      list(APPEND toolchain_args "-D${variable}:FILEPATH=${${variable}}")
     endif()
   endforeach()
-  list(APPEND cmake_args ${GR4_EXTRA_CMAKE_ARGS} ${PROJECT_CMAKE_ARGS})
+
+  set(install_command_args "")
+  if(name STREQUAL "gnuradio4-deps")
+    set(dependency_build_type "${CMAKE_BUILD_TYPE}")
+    if(NOT dependency_build_type MATCHES "^(Debug|Release|RelWithDebInfo|MinSizeRel)$")
+      set(dependency_build_type Release)
+    endif()
+    set(dependency_cmake_args
+        "-DCMAKE_INSTALL_LIBDIR:STRING=${CMAKE_INSTALL_LIBDIR}"
+        "-DCMAKE_INSTALL_BINDIR:STRING=${CMAKE_INSTALL_BINDIR}"
+        "-DBUILD_SHARED_LIBS:BOOL=${BUILD_SHARED_LIBS}"
+        ${toolchain_args})
+    list(JOIN dependency_cmake_args "|" dependency_cmake_args_value)
+    list(APPEND cmake_args
+        "-DGR_DEPS_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}"
+        "-DGR_DEPS_BUILD_TYPE:STRING=${dependency_build_type}"
+        "-DGR_DEPS_EXTRA_CMAKE_ARGS:STRING=${dependency_cmake_args_value}")
+    # The dependency superbuild installs each package during its build step.
+    set(install_command_args INSTALL_COMMAND "${CMAKE_COMMAND}" -E true)
+  endif()
+  list(APPEND cmake_args ${toolchain_args} ${GR4_EXTRA_CMAKE_ARGS} ${PROJECT_CMAKE_ARGS})
 
   set(build_command_args "")
   if(NOT gr4_effective_build_parallel_level STREQUAL "")
@@ -201,6 +222,7 @@ function(gr4_add_project name)
     CMAKE_GENERATOR "${CMAKE_GENERATOR}"
     CMAKE_ARGS ${cmake_args}
     ${build_command_args}
+    ${install_command_args}
     BUILD_ALWAYS TRUE
     STEP_TARGETS download
     DEPENDS ${PROJECT_DEPENDS}
