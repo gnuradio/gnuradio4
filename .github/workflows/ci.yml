@@ -49,10 +49,18 @@ jobs:
             }
 
   integration:
-    name: Ubuntu 24.04 | GCC 14 | complete stack
+    name: ${{ matrix.name }}
     needs: dco
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu 24.04 | GCC 14 | complete stack
+            runs-on: ubuntu-latest
+          - name: Ubuntu 24.04 | GCC 14 | complete stack | aarch64
+            runs-on: ubuntu-24.04-arm
     container:
       image: ghcr.io/gnuradio/ci:ubuntu-24.04-4.0
 
