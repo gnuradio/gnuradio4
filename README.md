@@ -136,6 +136,7 @@ independently owned and can be added to the workspace as described in the
 | Select modules or register a workspace module | [Module configuration](docs/modules.md) |
 | Launch desktop or browser Studio | [Studio guide](docs/studio.md) |
 | Run component and integration tests | [Testing guide](docs/testing.md) |
+| Build a Windows or macOS installer | [Packaging guide](docs/packaging.md) |
 | Develop a child repository or add an out-of-tree project | [Extending the workspace](docs/extending.md) |
 | Understand CI and test/container image policy | [CI and containers](docs/ci.md) |
 | Understand the superbuild's architectural choices | [Design](DESIGN.md) |

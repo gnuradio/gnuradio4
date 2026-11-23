@@ -122,8 +122,31 @@ function(gr4_register_module)
       "${cmake_args_variable}"
       ""
       CACHE STRING "Additional CMake arguments passed only to ${MODULE_NAME}")
+
+    # Moves the build tree; empty keeps it below the superbuild's binary
+    # directory. A build tree belongs to one module rather than to a checkout,
+    # so modules sharing sources still get a variable each.
+    set(binary_dir_variable "GR4_${MODULE_OPTIONS_KEY}_BINARY_DIR")
+    set(
+      "${binary_dir_variable}"
+      ""
+      CACHE PATH "Build tree for ${MODULE_NAME} instead of the one below the superbuild's binary directory")
   else()
     set(cmake_args_variable "")
+    set(binary_dir_variable "")
+  endif()
+
+  # Points the module at a checkout anywhere on disk; empty keeps SOURCE_DIR
+  # below GR4_SOURCE_ROOT. Like REPOSITORY, it belongs to whoever owns the
+  # checkout, so a module with a SOURCE_PROVIDER uses the provider's variable.
+  if(MODULE_SOURCE_PROVIDER)
+    set(source_dir_variable "")
+  else()
+    set(source_dir_variable "GR4_${MODULE_SOURCE_KEY}_SOURCE_DIR")
+    set(
+      "${source_dir_variable}"
+      ""
+      CACHE PATH "Existing ${MODULE_NAME} source tree to build instead of the one below GR4_SOURCE_ROOT")
   endif()
 
   set_property(GLOBAL APPEND PROPERTY GR4_REGISTERED_MODULES "${MODULE_NAME}")
@@ -134,7 +157,9 @@ function(gr4_register_module)
     "${MODULE_NAME}" SOURCE_PROVIDER "${MODULE_SOURCE_PROVIDER}")
   _gr4_set_module_property("${MODULE_NAME}" REPOSITORY_VARIABLE "${repository_variable}")
   _gr4_set_module_property("${MODULE_NAME}" REF_VARIABLE "${ref_variable}")
+  _gr4_set_module_property("${MODULE_NAME}" SOURCE_DIR_VARIABLE "${source_dir_variable}")
   _gr4_set_module_property("${MODULE_NAME}" CMAKE_ARGS_VARIABLE "${cmake_args_variable}")
+  _gr4_set_module_property("${MODULE_NAME}" BINARY_DIR_VARIABLE "${binary_dir_variable}")
   _gr4_set_module_property("${MODULE_NAME}" CMAKE_ARGS "${MODULE_CMAKE_ARGS}")
   _gr4_set_module_property("${MODULE_NAME}" GROUPS "${MODULE_GROUPS}")
   _gr4_set_module_property("${MODULE_NAME}" DEPENDS "${MODULE_DEPENDS}")
@@ -276,11 +301,48 @@ function(gr4_realize_modules)
     _gr4_get_module_property(module_dependencies "${name}" DEPENDS)
     _gr4_get_module_property(optional_dependencies "${name}" OPTIONAL_DEPENDS)
     _gr4_get_module_property(module_tests "${name}" TESTS)
+    _gr4_get_module_property(source_dir_variable "${name}" SOURCE_DIR_VARIABLE)
+    _gr4_get_module_property(binary_dir_variable "${name}" BINARY_DIR_VARIABLE)
 
-    cmake_path(
-      ABSOLUTE_PATH module_source_dir
-      BASE_DIRECTORY "${GR4_SOURCE_ROOT}"
-      NORMALIZE)
+    if(module_source_provider)
+      # the provider owns the shared checkout, so moving it moves this module too
+      _gr4_get_module_property(
+        source_dir_variable "${module_source_provider}" SOURCE_DIR_VARIABLE)
+    endif()
+    set(source_override "")
+    if(source_dir_variable)
+      set(source_override "${${source_dir_variable}}")
+    endif()
+
+    if(source_override STREQUAL "")
+      cmake_path(
+        ABSOLUTE_PATH module_source_dir
+        BASE_DIRECTORY "${GR4_SOURCE_ROOT}"
+        NORMALIZE)
+    else()
+      cmake_path(
+        ABSOLUTE_PATH source_override
+        BASE_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        NORMALIZE)
+      set(module_source_dir "${source_override}")
+
+      # an explicit location is never cloned into, so it must already hold the module
+      if(module_type STREQUAL "NODE")
+        set(source_marker "${module_source_dir}/package.json")
+      elseif(module_source_subdir)
+        set(source_marker "${module_source_dir}/${module_source_subdir}/CMakeLists.txt")
+      else()
+        set(source_marker "${module_source_dir}/CMakeLists.txt")
+      endif()
+      if(NOT EXISTS "${source_marker}")
+        message(FATAL_ERROR
+          "${source_dir_variable} is '${module_source_dir}', but ${source_marker} does not exist")
+      endif()
+      message(STATUS "${name}: using sources in ${module_source_dir}")
+    endif()
+
+    # the packaging code needs the resolved path, which exists only here
+    _gr4_set_module_property("${name}" RESOLVED_SOURCE_DIR "${module_source_dir}")
 
     foreach(dependency IN LISTS optional_dependencies)
       if(dependency IN_LIST selected_modules)
@@ -299,6 +361,17 @@ function(gr4_realize_modules)
         set(source_subdir_argument SOURCE_SUBDIR "${module_source_subdir}")
       endif()
 
+      set(binary_dir_argument "")
+      if(binary_dir_variable AND NOT "${${binary_dir_variable}}" STREQUAL "")
+        set(module_binary_dir "${${binary_dir_variable}}")
+        cmake_path(
+          ABSOLUTE_PATH module_binary_dir
+          BASE_DIRECTORY "${CMAKE_SOURCE_DIR}"
+          NORMALIZE)
+        set(binary_dir_argument BINARY_DIR "${module_binary_dir}")
+        message(STATUS "${name}: building in ${module_binary_dir}")
+      endif()
+
       set(repository_arguments "")
       if(repository_variable)
         set(repository_arguments
@@ -315,6 +388,7 @@ function(gr4_realize_modules)
         "${name}"
         SOURCE_DIR "${module_source_dir}"
         ${source_subdir_argument}
+        ${binary_dir_argument}
         ${repository_arguments}
         DEPENDS ${module_dependencies}
         CMAKE_ARGS ${component_cmake_args}

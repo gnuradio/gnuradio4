@@ -1,0 +1,150 @@
+@echo off
+rem Prepares the current cmd session to use this GNU Radio 4 install.
+rem
+rem     "<install root>\gr4-env.cmd"
+rem     "<install root>\gr4-env.cmd" /vs
+rem     "<install root>\gr4-env.cmd" /vs:2022 /arch:x64
+rem
+rem Everything is derived from this script's own location, so the install can
+rem be moved. Nothing outside the session is changed: no environment variable
+rem is persisted and no registry key is written, which is why the shell has to
+rem be entered rather than the machine configured.
+rem
+rem   /vs[:<version>]  also enter the Visual Studio developer environment, so
+rem                    one prompt has cl.exe, ninja and GNU Radio 4. <version>
+rem                    is a year (2019, 2022) or a major version (16, 17);
+rem                    without one the latest installed is used.
+rem   /arch:<arch>     target architecture for that environment, default x64.
+
+setlocal EnableDelayedExpansion
+
+rem Before the argument loop: shift moves %0 as well, so %~dp0 stops
+rem naming this script once any argument has been consumed.
+rem %~dp0 also keeps its trailing backslash, which would escape the
+rem closing quote.
+set "GR4_PREFIX=%~dp0"
+if "%GR4_PREFIX:~-1%"=="\" set "GR4_PREFIX=%GR4_PREFIX:~0,-1%"
+
+set "GR4_WANT_VS="
+set "GR4_VS_VERSION="
+set "GR4_VS_ARCH=x64"
+
+:parse_args
+if "%~1"=="" goto args_done
+set "GR4_ARG=%~1"
+if /i "!GR4_ARG!"=="/vs" (
+    set "GR4_WANT_VS=1"
+) else if /i "!GR4_ARG:~0,4!"=="/vs:" (
+    set "GR4_WANT_VS=1"
+    set "GR4_VS_VERSION=!GR4_ARG:~4!"
+) else if /i "!GR4_ARG:~0,6!"=="/arch:" (
+    set "GR4_VS_ARCH=!GR4_ARG:~6!"
+) else (
+    echo Unknown option: !GR4_ARG!
+    echo Usage: gr4-env.cmd [/vs^[:version^]] [/arch:x64^|x86^|arm64]
+    exit /b 1
+)
+shift
+goto parse_args
+:args_done
+
+set "GR4_API_VERSION=@GR_PLUGIN_API_VERSION@"
+set "GR4_LIBDIR=%GR4_PREFIX%\lib"
+
+set "GR4_PLUGIN_LIBDIR=%GR4_LIBDIR%\gnuradio-4\plugins"
+rem The plugin directory goes on PATH as well as bin. The block libraries
+rem live there, and a program that LINKS one rather than loading it through
+rem the plugin loader needs Windows to resolve the DLL through the loader
+rem search path. The plugin loader itself uses absolute paths and does not
+rem need this.
+set "GR4_NEW_PATH=%GR4_PREFIX%\bin;%GR4_PLUGIN_LIBDIR%;%PATH%"
+if defined CMAKE_PREFIX_PATH (
+    set "GR4_NEW_CMAKE_PREFIX_PATH=%GR4_PREFIX%;%CMAKE_PREFIX_PATH%"
+) else (
+    set "GR4_NEW_CMAKE_PREFIX_PATH=%GR4_PREFIX%"
+)
+set "GR4_NEW_PKG_CONFIG_PATH=%GR4_LIBDIR%\pkgconfig;%GR4_PREFIX%\share\pkgconfig"
+if defined PKG_CONFIG_PATH set "GR4_NEW_PKG_CONFIG_PATH=%GR4_NEW_PKG_CONFIG_PATH%;%PKG_CONFIG_PATH%"
+
+rem Plugins live outside the prefix, in the shared tree the installers record
+rem in the manifest: under ProgramData for a machine-wide install and
+rem LocalAppData for a per-user one. Both are listed when both exist, so a
+rem user-scope module installed on top of a machine-wide core is still found.
+set "GR4_NEW_PLUGIN_DIRS="
+for %%B in ("%LOCALAPPDATA%" "%ProgramData%") do (
+    if not "%%~B"=="" (
+        if exist "%%~B\.gnuradio-4\plugins\v%GR4_API_VERSION%\" (
+            if defined GR4_NEW_PLUGIN_DIRS (
+                set "GR4_NEW_PLUGIN_DIRS=!GR4_NEW_PLUGIN_DIRS!;%%~B\.gnuradio-4\plugins\v%GR4_API_VERSION%"
+            ) else (
+                set "GR4_NEW_PLUGIN_DIRS=%%~B\.gnuradio-4\plugins\v%GR4_API_VERSION%"
+            )
+        )
+    )
+)
+if defined GR4_NEW_PLUGIN_DIRS (
+    set "GR4_NEW_PLUGIN_DIRS=!GR4_NEW_PLUGIN_DIRS!;%GR4_PLUGIN_LIBDIR%;%GR4_LIBDIR%"
+) else (
+    set "GR4_NEW_PLUGIN_DIRS=%GR4_PLUGIN_LIBDIR%;%GR4_LIBDIR%"
+)
+if defined GNURADIO4_PLUGIN_DIRECTORIES (
+    set "GR4_NEW_PLUGIN_DIRS=!GR4_NEW_PLUGIN_DIRS!;%GNURADIO4_PLUGIN_DIRECTORIES%"
+)
+
+set "GR4_VS_INSTALL="
+if defined GR4_WANT_VS call :find_vs
+
+rem endlocal drops everything set above, so the keepers are carried out through
+rem the one command the parent shell still sees
+endlocal & (
+    set "GR4_PREFIX=%GR4_PREFIX%"
+    set "PATH=%GR4_NEW_PATH%"
+    set "CMAKE_PREFIX_PATH=%GR4_NEW_CMAKE_PREFIX_PATH%"
+    set "PKG_CONFIG_PATH=%GR4_NEW_PKG_CONFIG_PATH%"
+    set "GNURADIO4_PLUGIN_DIRECTORIES=%GR4_NEW_PLUGIN_DIRS%"
+    set "GR4_VS_INSTALL=%GR4_VS_INSTALL%"
+    set "GR4_VS_ARCH=%GR4_VS_ARCH%"
+)
+
+if defined GR4_VS_INSTALL (
+    call "%GR4_VS_INSTALL%\Common7\Tools\VsDevCmd.bat" -arch=%GR4_VS_ARCH% -host_arch=x64 -no_logo
+    echo Visual Studio: %GR4_VS_INSTALL% ^(%GR4_VS_ARCH%^)
+)
+set "GR4_VS_INSTALL="
+set "GR4_VS_ARCH="
+
+echo GNU Radio 4 @GR4_BUNDLE_VERSION@ ready in %GR4_PREFIX%
+echo   plugins: %GNURADIO4_PLUGIN_DIRECTORIES%
+echo   tools:   grinfo, rungraph, graphdoc
+exit /b 0
+
+:find_vs
+rem delayed expansion, because the parens in the name confuse the parser
+set "GR4_VSWHERE=!ProgramFiles(x86)!\Microsoft Visual Studio\Installer\vswhere.exe"
+if not exist "%GR4_VSWHERE%" goto no_vswhere
+
+rem A year or a bare major version both become the [major,major+1) range
+rem vswhere wants. Assembled on single lines rather than inside an if block,
+rem and kept quoted, because an unquoted ")" closes the block cmd is parsing.
+set "GR4_VS_RANGE="
+if not defined GR4_VS_VERSION goto run_vswhere
+set "GR4_VS_MAJOR=%GR4_VS_VERSION%"
+if "%GR4_VS_VERSION%"=="2017" set "GR4_VS_MAJOR=15"
+if "%GR4_VS_VERSION%"=="2019" set "GR4_VS_MAJOR=16"
+if "%GR4_VS_VERSION%"=="2022" set "GR4_VS_MAJOR=17"
+set "GR4_VS_NEXT="
+set /a "GR4_VS_NEXT=%GR4_VS_MAJOR% + 1" >nul 2>nul
+rem not a version we recognise: hand it to vswhere as the user wrote it
+if not defined GR4_VS_NEXT set "GR4_VS_RANGE=-version "%GR4_VS_VERSION%"" & goto run_vswhere
+set "GR4_VS_RANGE=-version "[%GR4_VS_MAJOR%.0,%GR4_VS_NEXT%.0)""
+
+:run_vswhere
+rem delayed expansion again: "C:\Program Files (x86)" expanded early would
+rem close the for block on its own parenthesis
+for /f "usebackq delims=" %%I in (`""!GR4_VSWHERE!" -latest -products * !GR4_VS_RANGE! -property installationPath"`) do set "GR4_VS_INSTALL=%%I"
+if not defined GR4_VS_INSTALL echo Warning: no Visual Studio installation found, continuing without it.
+exit /b 0
+
+:no_vswhere
+echo Warning: vswhere.exe not found, continuing without Visual Studio.
+exit /b 0

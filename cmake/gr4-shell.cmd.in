@@ -1,0 +1,4 @@
+@echo off
+rem Opens a command prompt set up for this GNU Radio 4 install. This is what
+rem the Start Menu shortcut runs; pass /vs for the Visual Studio variant.
+cmd.exe /k ""%~dp0gr4-env.cmd" %*"

@@ -1,0 +1,11 @@
+@echo off
+rem Opens a command prompt with both the Visual Studio build tools and this
+rem GNU Radio 4 install. Extra arguments reach gr4-env.cmd, so a different
+rem toolset is one flag away:
+rem
+rem     gr4-dev-shell.cmd /vs:2019 /arch:x86
+if "%~1"=="" (
+    cmd.exe /k ""%~dp0gr4-env.cmd" /vs"
+) else (
+    cmd.exe /k ""%~dp0gr4-env.cmd" /vs %*"
+)

@@ -117,6 +117,30 @@
         "GR4_MODULE_GROUPS": "base;full",
         "GR4_BLOCKS_CMAKE_ARGS": "-DGR4_ENABLE_ZEROMQ=ON;-DGR4_ENABLE_SDR=ON;-DGR4_ENABLE_AUDIO=ON"
       }
+    },
+    {
+      "name": "debug-package",
+      "displayName": "GNU Radio 4 debug build for the installer",
+      "inherits": "debug",
+      "binaryDir": "${sourceDir}/build/debug-package",
+      "cacheVariables": {
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/debug-package",
+        "GR_ENABLE_PACKAGING": "ON",
+        "GR4_MODULES": "gnuradio4-control-plane",
+        "GR4_BUILD_TESTING": "OFF"
+      }
+    },
+    {
+      "name": "release-package",
+      "displayName": "GNU Radio 4 installer",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build/release-package",
+      "cacheVariables": {
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release-package",
+        "GR_ENABLE_PACKAGING": "ON",
+        "GR4_MODULES": "gnuradio4-control-plane",
+        "GR4_DEBUG_PACKAGING_DIR": "${sourceDir}/build/debug-package/packaging/components"
+      }
     }
   ],
   "buildPresets": [
@@ -163,6 +187,16 @@
     {
       "name": "full-ci",
       "configurePreset": "full-ci",
+      "jobs": 0
+    },
+    {
+      "name": "debug-package",
+      "configurePreset": "debug-package",
+      "jobs": 0
+    },
+    {
+      "name": "release-package",
+      "configurePreset": "release-package",
       "jobs": 0
     }
   ]

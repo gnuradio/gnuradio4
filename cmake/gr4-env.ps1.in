@@ -1,0 +1,121 @@
+<#
+    .SYNOPSIS
+        Prepares the current PowerShell session to use this GNU Radio 4 install.
+
+    .DESCRIPTION
+        The Windows counterpart of the superbuild's activate.sh. Dot-source it:
+
+            . "<install root>\gr4-env.ps1"
+            . "<install root>\gr4-env.ps1" -VsDevShell -VsVersion 2022
+
+        Everything is derived from this script's own location, so the install
+        can be moved. Nothing outside the session is changed: no environment
+        variable is persisted and no registry key is written, which is why the
+        shell has to be entered rather than the machine configured.
+
+    .PARAMETER VsDevShell
+        Also enter the Visual Studio developer environment, giving one prompt
+        with cl.exe, ninja and GNU Radio 4 all configured.
+
+    .PARAMETER VsVersion
+        Which Visual Studio to use: a year (2019, 2022) or a major version
+        (16, 17). Defaults to the latest installed.
+
+    .PARAMETER VsArch
+        Target architecture for the developer environment. Defaults to x64.
+
+    .PARAMETER VsPath
+        An explicit Visual Studio installation root, bypassing the search.
+#>
+[CmdletBinding()]
+param(
+    [switch] $VsDevShell,
+    [string] $VsVersion = '',
+    [string] $VsArch = 'x64',
+    [string] $VsPath = ''
+)
+
+$gr4Prefix = $PSScriptRoot
+$gr4LibDir = Join-Path $gr4Prefix 'lib'
+$gr4ApiVersion = '@GR_PLUGIN_API_VERSION@'
+
+$env:GR4_PREFIX = $gr4Prefix
+# The plugin directory goes on PATH as well as bin. The block libraries live
+# there, and a program that LINKS one rather than loading it through the plugin
+# loader needs Windows to resolve the DLL through the loader search path. The
+# plugin loader itself uses absolute paths and does not need this.
+$gr4PluginLibDir = Join-Path $gr4LibDir 'gnuradio-4\plugins'
+$env:PATH = (Join-Path $gr4Prefix 'bin') + ';' + $gr4PluginLibDir + ';' + $env:PATH
+$env:CMAKE_PREFIX_PATH = if ($env:CMAKE_PREFIX_PATH) { "$gr4Prefix;$($env:CMAKE_PREFIX_PATH)" } else { $gr4Prefix }
+
+$gr4PkgConfig = @((Join-Path $gr4LibDir 'pkgconfig'), (Join-Path $gr4Prefix 'share\pkgconfig'))
+if ($env:PKG_CONFIG_PATH) { $gr4PkgConfig += $env:PKG_CONFIG_PATH }
+$env:PKG_CONFIG_PATH = $gr4PkgConfig -join ';'
+
+# Plugins live outside the prefix, in the shared tree the installers record in
+# the manifest: under ProgramData for a machine-wide install and LocalAppData
+# for a per-user one. Both are listed when both exist, so a user-scope module
+# installed on top of a machine-wide core is still found.
+$gr4PluginDirectories = @()
+foreach ($base in @($env:LOCALAPPDATA, $env:ProgramData)) {
+    if (-not $base) { continue }
+    $candidate = Join-Path $base ".gnuradio-4\plugins\v$gr4ApiVersion"
+    if (Test-Path -LiteralPath $candidate) { $gr4PluginDirectories += $candidate }
+}
+$gr4PluginDirectories += $gr4PluginLibDir
+$gr4PluginDirectories += $gr4LibDir
+if ($env:GNURADIO4_PLUGIN_DIRECTORIES) { $gr4PluginDirectories += $env:GNURADIO4_PLUGIN_DIRECTORIES }
+$env:GNURADIO4_PLUGIN_DIRECTORIES = $gr4PluginDirectories -join ';'
+
+function Find-Gr4VisualStudio {
+    param([string] $Version)
+
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (-not (Test-Path -LiteralPath $vswhere)) { return '' }
+
+    $arguments = @('-latest', '-products', '*', '-property', 'installationPath')
+    if ($Version) {
+        # a year or a bare major version both become the [major,major+1) range
+        # vswhere wants; anything else is passed through as the user wrote it
+        $major = switch ($Version) {
+            '2017'  { '15'; break }
+            '2019'  { '16'; break }
+            '2022'  { '17'; break }
+            default { if ($Version -match '^\d+$') { $Version } else { '' } }
+        }
+        if ($major) {
+            $arguments += @('-version', "[${major}.0,$([int]$major + 1).0)")
+        } else {
+            $arguments += @('-version', $Version)
+        }
+    }
+
+    # an argument it dislikes makes vswhere print its banner on stdout, so the
+    # output is only trusted when it names a directory that exists
+    $found = & $vswhere @arguments 2>$null |
+        Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) }
+    return ($found | Select-Object -First 1)
+}
+
+if ($VsDevShell) {
+    $installPath = if ($VsPath) { $VsPath } else { Find-Gr4VisualStudio -Version $VsVersion }
+    if (-not $installPath) {
+        Write-Warning "No Visual Studio installation found$(if ($VsVersion) { " for version $VsVersion" }); continuing without it."
+    } else {
+        $devShell = Join-Path $installPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll'
+        if (-not (Test-Path -LiteralPath $devShell)) {
+            Write-Warning "No developer shell module in $installPath; continuing without it."
+        } else {
+            Import-Module $devShell
+            # -SkipAutomaticLocation keeps the current directory, which a shell
+            # opened in the install root should not lose
+            Enter-VsDevShell -VsInstallPath $installPath -SkipAutomaticLocation `
+                -DevCmdArguments "-arch=$VsArch -host_arch=x64" | Out-Null
+            Write-Host "Visual Studio: $installPath ($VsArch)" -ForegroundColor Green
+        }
+    }
+}
+
+Write-Host "GNU Radio 4 @GR4_BUNDLE_VERSION@ ready in $gr4Prefix" -ForegroundColor Green
+Write-Host "  plugins: $($env:GNURADIO4_PLUGIN_DIRECTORIES)"
+Write-Host "  tools:   grinfo, rungraph, graphdoc"
