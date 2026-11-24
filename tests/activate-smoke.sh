@@ -33,7 +33,10 @@ render() {
   sed \
     -e "s|@CMAKE_BINARY_DIR@|$1/build|g" \
     -e "s|@CMAKE_INSTALL_PREFIX@|$1|g" \
+    -e "s|@CMAKE_INSTALL_BINDIR@|bin|g" \
     -e "s|@GR4_INSTALL_LIBDIR_FULL@|$1/lib|g" \
+    -e "s|@GR4_DEPS_INSTALL_PREFIX@|$1|g" \
+    -e "s|@GR4_DEPS_LIBDIR_FULL@|$1/lib|g" \
     "$template" >"$out"
   printf '%s\n' "$out"
 }
